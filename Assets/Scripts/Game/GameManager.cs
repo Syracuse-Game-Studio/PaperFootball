@@ -1,5 +1,6 @@
 ﻿using PaperFootball.Ball;
 using PaperFootball.Grid;
+using PaperFootball.Input;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ namespace PaperFootball.Game
         [SerializeField] private TurnManager turnManager;
         [SerializeField] private ScoreManager scoreManager;
         [SerializeField] private MovementValidator movementValidator;
+        [SerializeField] private InputManager inputManager;
 
         [Header("Game Settings")]
         [SerializeField] private bool autoStartGame = true;
@@ -71,19 +73,27 @@ namespace PaperFootball.Game
             if (turnManager == null) turnManager = TurnManager.Instance;
             if (scoreManager == null) scoreManager = ScoreManager.Instance;
             if (movementValidator == null) movementValidator = MovementValidator.Instance;
+            if (inputManager == null) inputManager = InputManager.Instance;
 
-            // Subscribe to events
+            // Subscribe to turn manager events
             if (turnManager != null)
             {
                 turnManager.OnTurnChanged += OnTurnChanged;
                 turnManager.OnMoveCompleted += OnMoveCompleted;
             }
 
+            // Subscribe to score manager events
             if (scoreManager != null)
             {
                 scoreManager.OnTouchdown += OnTouchdown;
                 scoreManager.OnGameWon += OnGameWon;
                 scoreManager.OnDeadEnd += OnDeadEnd;
+            }
+
+            // Subscribe to input manager events
+            if (inputManager != null)
+            {
+                inputManager.OnGridPositionClicked += OnGridPositionClicked;
             }
 
             Debug.Log("Game Manager initialized!");
@@ -94,7 +104,7 @@ namespace PaperFootball.Game
         /// </summary>
         public void StartGame()
         {
-            Debug.Log("🎮 Starting new game of Paper Football!");
+            Debug.Log("Starting new game of Paper Football!");
 
             // Reset all systems
             if (gridManager != null) gridManager.ResetGrid();
@@ -107,6 +117,12 @@ namespace PaperFootball.Game
             {
                 GridNode startNode = gridManager.GetNode(ballToken.CurrentGridPosition);
                 startNode?.Visit();
+            }
+
+            // Enable input
+            if (inputManager != null)
+            {
+                inputManager.EnableInput();
             }
 
             CurrentState = GameState.WaitingForInput;
@@ -135,6 +151,17 @@ namespace PaperFootball.Game
             }
 
             Debug.Log($"Valid moves available: {currentValidMoves.Count}");
+        }
+
+        /// <summary>
+        /// Handles input when a grid position is clicked
+        /// </summary>
+        private void OnGridPositionClicked(Vector2Int gridPosition)
+        {
+            if (CurrentState != GameState.WaitingForInput) return;
+
+            Debug.Log($"Grid position clicked: {gridPosition}");
+            AttemptMove(gridPosition);
         }
 
         /// <summary>
@@ -168,6 +195,12 @@ namespace PaperFootball.Game
         {
             CurrentState = GameState.ProcessingMove;
 
+            // Disable input during move
+            if (inputManager != null)
+            {
+                inputManager.DisableInput();
+            }
+
             Vector2Int previousPosition = ballToken.CurrentGridPosition;
             GridNode targetNode = gridManager.GetNode(targetPosition);
 
@@ -175,6 +208,7 @@ namespace PaperFootball.Game
             {
                 Debug.LogError($"Target node not found at {targetPosition}");
                 CurrentState = GameState.WaitingForInput;
+                if (inputManager != null) inputManager.EnableInput();
                 return;
             }
 
@@ -215,6 +249,7 @@ namespace PaperFootball.Game
             else
             {
                 CurrentState = GameState.WaitingForInput;
+                if (inputManager != null) inputManager.EnableInput();
             }
         }
 
@@ -229,6 +264,7 @@ namespace PaperFootball.Game
             }
 
             CurrentState = GameState.WaitingForInput;
+            if (inputManager != null) inputManager.EnableInput();
         }
 
         /// <summary>
@@ -245,6 +281,7 @@ namespace PaperFootball.Game
             if (scoreManager != null && scoreManager.GameOver)
             {
                 CurrentState = GameState.GameOver;
+                if (inputManager != null) inputManager.DisableInput();
             }
             else
             {
@@ -266,6 +303,7 @@ namespace PaperFootball.Game
             }
 
             CurrentState = GameState.GameOver;
+            if (inputManager != null) inputManager.DisableInput();
         }
 
         /// <summary>
@@ -339,6 +377,11 @@ namespace PaperFootball.Game
                 scoreManager.OnTouchdown -= OnTouchdown;
                 scoreManager.OnGameWon -= OnGameWon;
                 scoreManager.OnDeadEnd -= OnDeadEnd;
+            }
+
+            if (inputManager != null)
+            {
+                inputManager.OnGridPositionClicked -= OnGridPositionClicked;
             }
         }
     }
