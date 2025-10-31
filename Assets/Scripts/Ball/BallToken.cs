@@ -5,36 +5,47 @@ namespace PaperFootball.Ball
 {
     /// <summary>
     /// Represents the football token that moves across the grid.
+    /// Now supports both grid-based movement and physics-based flicking.
     /// </summary>
+    [RequireComponent(typeof(PaperFootballMesh), typeof(PaperFootballPhysics))]
     public class BallToken : MonoBehaviour
     {
+        [Header("Movement Mode")]
+        [SerializeField] private bool usePhysicsMode = true; // Toggle between grid and physics
+
         [Header("Movement Settings")]
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private AnimationCurve moveCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
         [Header("Visual Settings")]
-        [SerializeField] private Color ballColor = Color.black;
+        [SerializeField] private Color ballColor = Color.white;
         [SerializeField] private float ballSize = 0.3f;
 
         // Current grid position
         public Vector2Int CurrentGridPosition { get; private set; }
 
         // Is the ball currently moving
-        public bool IsMoving { get; private set; }
+        public bool IsMoving => usePhysicsMode ? physicsController.IsMoving : isMovingGrid;
+        private bool isMovingGrid;
 
         private Grid.GridManager gridManager;
-        private Renderer ballRenderer;
+        private PaperFootballMesh meshGenerator;
+        private PaperFootballPhysics physicsController;
 
         private void Awake()
         {
-            // Setup visual
-            ballRenderer = GetComponent<Renderer>();
-            if (ballRenderer != null)
-            {
-                ballRenderer.material.color = ballColor;
-            }
+            // Get components
+            meshGenerator = GetComponent<PaperFootballMesh>();
+            physicsController = GetComponent<PaperFootballPhysics>();
 
             transform.localScale = Vector3.one * ballSize;
+
+            // Subscribe to physics events
+            if (physicsController != null)
+            {
+                physicsController.OnFlick += OnBallFlicked;
+                physicsController.OnLanded += OnBallLanded;
+            }
         }
 
         private void Start()
@@ -57,7 +68,15 @@ namespace PaperFootball.Ball
 
             CurrentGridPosition = gridPos;
             Vector3 worldPos = gridManager.GridToWorldPosition(gridPos);
-            transform.position = worldPos;
+
+            if (usePhysicsMode && physicsController != null)
+            {
+                physicsController.SetPosition(worldPos);
+            }
+            else
+            {
+                transform.position = worldPos;
+            }
 
             // Mark node as visited
             Grid.GridNode node = gridManager.GetNode(gridPos);
@@ -69,7 +88,7 @@ namespace PaperFootball.Ball
         /// </summary>
         public void MoveTo(Vector2Int targetGridPos, System.Action onComplete = null)
         {
-            if (IsMoving)
+            if (isMovingGrid)
             {
                 Debug.LogWarning("Ball is already moving!");
                 return;
@@ -83,7 +102,7 @@ namespace PaperFootball.Ball
         /// </summary>
         private IEnumerator MoveCoroutine(Vector2Int targetGridPos, System.Action onComplete)
         {
-            IsMoving = true;
+            isMovingGrid = true;
 
             Vector3 startPos = transform.position;
             Vector3 targetPos = gridManager.GridToWorldPosition(targetGridPos);
@@ -109,7 +128,7 @@ namespace PaperFootball.Ball
             Grid.GridNode node = gridManager.GetNode(targetGridPos);
             node?.Visit();
 
-            IsMoving = false;
+            isMovingGrid = false;
             onComplete?.Invoke();
         }
 
@@ -129,6 +148,51 @@ namespace PaperFootball.Ball
             if (gridManager != null)
             {
                 SetPosition(gridManager.StartPosition);
+            }
+        }
+
+        /// <summary>
+        /// Called when the ball is flicked
+        /// </summary>
+        private void OnBallFlicked(float force)
+        {
+            Debug.Log($"Ball flicked with force: {force:F2}");
+            // Add visual/audio feedback here
+        }
+
+        /// <summary>
+        /// Called when the ball lands after physics movement
+        /// </summary>
+        private void OnBallLanded()
+        {
+            Debug.Log("Ball landed!");
+
+            // Update grid position based on world position
+            if (gridManager != null && usePhysicsMode)
+            {
+                Vector2Int nearestGridPos = gridManager.WorldToGridPosition(transform.position);
+                CurrentGridPosition = nearestGridPos;
+
+                // Mark node as visited
+                Grid.GridNode node = gridManager.GetNode(nearestGridPos);
+                node?.Visit();
+            }
+        }
+
+        /// <summary>
+        /// Toggles between physics and grid movement modes
+        /// </summary>
+        public void SetPhysicsMode(bool enabled)
+        {
+            usePhysicsMode = enabled;
+        }
+
+        private void OnDestroy()
+        {
+            if (physicsController != null)
+            {
+                physicsController.OnFlick -= OnBallFlicked;
+                physicsController.OnLanded -= OnBallLanded;
             }
         }
     }
