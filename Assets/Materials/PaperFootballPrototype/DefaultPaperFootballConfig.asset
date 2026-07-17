@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f99cfc6928739254393c8c73a636b007, type: 3}
+  m_Name: DefaultPaperFootballConfig
+  m_EditorClassIdentifier: 
+  rules:
+    touchdownPoints: 6
+    successfulKickPoints: 3
+    targetScore: 21
+    maximumPossessions: 0
+    touchdownRequiresOverhang: 1
+    requiredOverhangPercent: 0
+    minimumSupportedPercent: 0.25
+    fallingFromTableChangesPossession: 1
+    maximumFlickForce: 18
+    minimumFlickForce: 1.5
+    minimumDragDistance: 0.05
+    maximumDragDistance: 2.5
+    footballStoppingThreshold: 0.08
+    angularStoppingThreshold: 0.25
+    requiredStillTime: 0.35
+    fallHeight: -1.2
+    fieldGoalTimeLimit: 6
+    turnTimeLimit: 0
+    kickoffOffsetFromCenter: 3.8

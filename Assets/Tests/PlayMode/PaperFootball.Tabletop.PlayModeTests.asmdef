@@ -1,0 +1,19 @@
+{
+  "name": "PaperFootball.Tabletop.PlayModeTests",
+  "rootNamespace": "PaperFootball.Tabletop.PlayModeTests",
+  "references": [
+    "PaperFootball.Tabletop"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "noEngineReferences": false
+}

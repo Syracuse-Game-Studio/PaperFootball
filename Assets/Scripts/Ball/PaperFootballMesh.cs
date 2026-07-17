@@ -109,16 +109,36 @@ namespace PaperFootball.Ball
         {
             if (paperMaterial != null)
             {
-                meshRenderer.material = paperMaterial;
+                meshRenderer.sharedMaterial = paperMaterial;
             }
-            else
+
+            if (meshRenderer.sharedMaterial != null)
             {
-                // Create a simple material if none provided
-                Material mat = new Material(Shader.Find("Standard"));
-                mat.color = paperColor;
-                mat.SetFloat("_Smoothness", 0.2f); // Slight roughness for paper
-                meshRenderer.material = mat;
+                return;
             }
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                shader = Shader.Find("Standard");
+            }
+
+            Material mat = new Material(shader);
+            if (mat.HasProperty("_BaseColor"))
+            {
+                mat.SetColor("_BaseColor", paperColor);
+            }
+            else if (mat.HasProperty("_Color"))
+            {
+                mat.SetColor("_Color", paperColor);
+            }
+
+            if (mat.HasProperty("_Smoothness"))
+            {
+                mat.SetFloat("_Smoothness", 0.2f);
+            }
+
+            meshRenderer.sharedMaterial = mat;
         }
 
         /// <summary>
