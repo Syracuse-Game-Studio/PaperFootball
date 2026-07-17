@@ -123,7 +123,15 @@ namespace PaperFootball.Editor
             lineRenderer.positionCount = 2;
             FlickAimIndicator indicator = EnsureComponent<FlickAimIndicator>(indicatorObject);
 
+            GameObject trajectoryObject = GetOrCreateChild("FieldGoalTrajectoryPreview", root.transform);
+            LineRenderer trajectoryLine = EnsureComponent<LineRenderer>(trajectoryObject);
+            trajectoryLine.sharedMaterial = indicatorMaterial;
+            trajectoryLine.positionCount = 0;
+            TrajectoryPreviewRenderer trajectoryPreview = EnsureComponent<TrajectoryPreviewRenderer>(trajectoryObject);
+            trajectoryPreview.Configure(footballBody, config.Rules);
+
             GameHudController hud = ConfigureHud(root.transform);
+            OverhangDebugOverlay overhangDebugOverlay = ConfigureOverhangDebugOverlay(hud.transform);
 
             GameObject fieldGoalObject = GetOrCreateChild("FieldGoalController", root.transform);
             FieldGoalController fieldGoalController = EnsureComponent<FieldGoalController>(fieldGoalObject);
@@ -144,6 +152,8 @@ namespace PaperFootball.Editor
                 boundaryDetector,
                 hud,
                 indicator,
+                overhangDebugOverlay,
+                trajectoryPreview,
                 fieldGoalController,
                 footballCollider,
                 playerOneStart.transform,
@@ -160,6 +170,8 @@ namespace PaperFootball.Editor
                 inputObject,
                 boundaryObject,
                 indicatorObject,
+                trajectoryObject,
+                overhangDebugOverlay.gameObject,
                 fieldGoalObject,
                 hud.gameObject,
                 matchObject);
@@ -223,7 +235,18 @@ namespace PaperFootball.Editor
                 config.Rules.angularStoppingThreshold = 0.25f;
                 config.Rules.requiredStillTime = 0.35f;
                 config.Rules.fallHeight = -1.2f;
+                config.Rules.fieldGoalTimeLimit = 6f;
                 config.Rules.kickoffOffsetFromCenter = 3.8f;
+                config.Rules.minimumFieldGoalForce = 2.5f;
+                config.Rules.maximumFieldGoalForce = 9f;
+                config.Rules.minimumFieldGoalLaunchAngle = 28f;
+                config.Rules.maximumFieldGoalLaunchAngle = 58f;
+                config.Rules.minimumFieldGoalUpwardForce = 2f;
+                config.Rules.maximumFieldGoalUpwardForce = 7f;
+                config.Rules.trajectoryPointCount = 28;
+                config.Rules.trajectoryTimeStep = 0.075f;
+                config.Rules.maximumTrajectoryPreviewTime = 2.1f;
+                config.Rules.trajectoryCollisionMask = 0;
                 AssetDatabase.CreateAsset(config, ConfigPath);
             }
 
@@ -393,6 +416,36 @@ namespace PaperFootball.Editor
 
             hud.Configure(p1, p2, player, phase, flick, fieldGoal, last, possession, controls);
             return hud;
+        }
+
+        private static OverhangDebugOverlay ConfigureOverhangDebugOverlay(Transform parent)
+        {
+            GameObject overlayObject = GetOrCreateUiChild("OverhangDebugOverlay", parent);
+            RectTransform overlayRect = EnsureComponent<RectTransform>(overlayObject);
+            overlayRect.anchorMin = new Vector2(1f, 1f);
+            overlayRect.anchorMax = new Vector2(1f, 1f);
+            overlayRect.pivot = new Vector2(1f, 1f);
+            overlayRect.anchoredPosition = new Vector2(-24f, -24f);
+            overlayRect.sizeDelta = new Vector2(560f, 440f);
+
+            GameObject textObject = GetOrCreateUiChild("OverhangDebugText", overlayObject.transform);
+            Text text = EnsureComponent<Text>(textObject);
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 18;
+            text.color = new Color(0.95f, 0.98f, 1f);
+            text.alignment = TextAnchor.UpperLeft;
+            text.raycastTarget = false;
+
+            RectTransform textRect = EnsureComponent<RectTransform>(textObject);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.pivot = new Vector2(1f, 1f);
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            OverhangDebugOverlay overlay = EnsureComponent<OverhangDebugOverlay>(overlayObject);
+            overlay.Configure(null, text, false);
+            return overlay;
         }
 
         private static Text ConfigureText(string name, Transform parent, Vector2 anchoredPosition, Font font, int fontSize, TextAnchor alignment)

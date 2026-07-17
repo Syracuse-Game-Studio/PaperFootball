@@ -24,6 +24,16 @@ namespace PaperFootball.Tabletop.Rules
         public float fieldGoalTimeLimit = 6f;
         public float turnTimeLimit = 0f;
         public float kickoffOffsetFromCenter = 3.8f;
+        public float minimumFieldGoalForce = 2.5f;
+        public float maximumFieldGoalForce = 9f;
+        public float minimumFieldGoalLaunchAngle = 28f;
+        public float maximumFieldGoalLaunchAngle = 58f;
+        public float minimumFieldGoalUpwardForce = 2f;
+        public float maximumFieldGoalUpwardForce = 7f;
+        public int trajectoryPointCount = 28;
+        public float trajectoryTimeStep = 0.075f;
+        public float maximumTrajectoryPreviewTime = 2.1f;
+        public int trajectoryCollisionMask = 0;
 
         public void Sanitize()
         {
@@ -40,7 +50,17 @@ namespace PaperFootball.Tabletop.Rules
             footballStoppingThreshold = Math.Max(0.001f, footballStoppingThreshold);
             angularStoppingThreshold = Math.Max(0.001f, angularStoppingThreshold);
             requiredStillTime = Math.Max(0.01f, requiredStillTime);
+            fieldGoalTimeLimit = Math.Max(0.25f, fieldGoalTimeLimit);
             kickoffOffsetFromCenter = Math.Max(0f, kickoffOffsetFromCenter);
+            maximumFieldGoalForce = Math.Max(0.01f, maximumFieldGoalForce);
+            minimumFieldGoalForce = Math.Max(0f, Math.Min(minimumFieldGoalForce, maximumFieldGoalForce));
+            minimumFieldGoalLaunchAngle = Math.Max(0f, Math.Min(minimumFieldGoalLaunchAngle, 89f));
+            maximumFieldGoalLaunchAngle = Math.Max(minimumFieldGoalLaunchAngle, Math.Min(maximumFieldGoalLaunchAngle, 89f));
+            maximumFieldGoalUpwardForce = Math.Max(0f, maximumFieldGoalUpwardForce);
+            minimumFieldGoalUpwardForce = Math.Max(0f, Math.Min(minimumFieldGoalUpwardForce, maximumFieldGoalUpwardForce));
+            trajectoryPointCount = Math.Max(2, trajectoryPointCount);
+            trajectoryTimeStep = Math.Max(0.01f, trajectoryTimeStep);
+            maximumTrajectoryPreviewTime = Math.Max(trajectoryTimeStep, maximumTrajectoryPreviewTime);
         }
 
         public PaperFootballRuleSet Clone()

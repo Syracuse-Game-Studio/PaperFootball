@@ -18,6 +18,7 @@ namespace PaperFootball.Tabletop.FieldGoals
 
         public bool AttemptActive => attemptActive;
         public bool ScoredThisAttempt => scoredThisAttempt;
+        public PaperFootballPlayer ActivePlayer => activePlayer;
 
         public event Action FieldGoalScored;
 

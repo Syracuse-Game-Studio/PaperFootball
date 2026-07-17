@@ -1,4 +1,5 @@
 using PaperFootball.Tabletop.Input;
+using PaperFootball.Tabletop.FieldGoals;
 using PaperFootball.Tabletop.Rules;
 using UnityEngine;
 
@@ -41,10 +42,18 @@ namespace PaperFootball.Tabletop.Physics
                 impulse += Vector3.up * upwardImpulse;
             }
 
-            body.AddForce(impulse, ForceMode.Impulse);
+            ApplyImpulse(impulse, command.Direction, command.Force);
+        }
 
-            float spin = Vector3.Dot(command.Direction, transform.right) * command.Force * spinImpulse;
-            body.AddTorque(Vector3.up * spin, ForceMode.Impulse);
+        public void KickFieldGoal(FieldGoalKickResult result)
+        {
+            if (body == null || !result.IsValid)
+            {
+                return;
+            }
+
+            body.WakeUp();
+            ApplyImpulse(result.TotalImpulse, result.HorizontalDirection, result.ForwardImpulse);
         }
 
         public void Stop()
@@ -91,6 +100,22 @@ namespace PaperFootball.Tabletop.Physics
             body.constraints = constrainFlipping
                 ? RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ
                 : RigidbodyConstraints.None;
+        }
+
+        private void ApplyImpulse(Vector3 impulse, Vector3 horizontalDirection, float spinForce)
+        {
+            body.AddForce(impulse, ForceMode.Impulse);
+
+            Vector3 spinDirection = horizontalDirection;
+            spinDirection.y = 0f;
+            if (spinDirection.sqrMagnitude <= 0.0001f)
+            {
+                return;
+            }
+
+            spinDirection.Normalize();
+            float spin = Vector3.Dot(spinDirection, transform.right) * spinForce * spinImpulse;
+            body.AddTorque(Vector3.up * spin, ForceMode.Impulse);
         }
     }
 }

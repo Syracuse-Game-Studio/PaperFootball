@@ -32,3 +32,13 @@ MonoBehaviour:
     fieldGoalTimeLimit: 6
     turnTimeLimit: 0
     kickoffOffsetFromCenter: 3.8
+    minimumFieldGoalForce: 2.5
+    maximumFieldGoalForce: 9
+    minimumFieldGoalLaunchAngle: 28
+    maximumFieldGoalLaunchAngle: 58
+    minimumFieldGoalUpwardForce: 2
+    maximumFieldGoalUpwardForce: 7
+    trajectoryPointCount: 28
+    trajectoryTimeStep: 0.075
+    maximumTrajectoryPreviewTime: 2.1
+    trajectoryCollisionMask: 0

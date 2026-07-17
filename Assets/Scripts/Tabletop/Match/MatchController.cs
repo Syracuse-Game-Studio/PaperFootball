@@ -1,3 +1,4 @@
+using System;
 using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.FieldGoals;
 using PaperFootball.Tabletop.Physics;
@@ -20,6 +21,8 @@ namespace PaperFootball.Tabletop.Match
         [SerializeField] private TableBoundaryDetector tableBoundary;
         [SerializeField] private GameHudController hud;
         [SerializeField] private FlickAimIndicator aimIndicator;
+        [SerializeField] private OverhangDebugOverlay overhangDebugOverlay;
+        [SerializeField] private TrajectoryPreviewRenderer trajectoryPreview;
         [SerializeField] private FieldGoalController fieldGoalController;
         [SerializeField] private Collider footballCollider;
         [SerializeField] private Transform playerOneStart;
@@ -28,8 +31,14 @@ namespace PaperFootball.Tabletop.Match
         private PaperFootballRuleSet rules;
         private PaperFootballMatch match;
         private bool fellResolved;
+        private OverhangDebugSnapshot? latestOverhangSnapshot;
+        private float fieldGoalAttemptTimer;
 
         public PaperFootballMatch Match => match;
+        public OverhangDebugSnapshot? LatestOverhangSnapshot => latestOverhangSnapshot;
+        public TrajectoryPreviewRenderer TrajectoryPreview => trajectoryPreview;
+
+        public event Action<OverhangDebugSnapshot> OverhangSnapshotChanged;
 
         public void Configure(
             PaperFootballConfig rulesConfig,
@@ -39,6 +48,8 @@ namespace PaperFootball.Tabletop.Match
             TableBoundaryDetector boundaryDetector,
             GameHudController hudController,
             FlickAimIndicator indicator,
+            OverhangDebugOverlay debugOverlay,
+            TrajectoryPreviewRenderer trajectoryRenderer,
             FieldGoalController goalController,
             Collider football,
             Transform p1Start,
@@ -51,6 +62,8 @@ namespace PaperFootball.Tabletop.Match
             tableBoundary = boundaryDetector;
             hud = hudController;
             aimIndicator = indicator;
+            overhangDebugOverlay = debugOverlay;
+            trajectoryPreview = trajectoryRenderer;
             fieldGoalController = goalController;
             footballCollider = football;
             playerOneStart = p1Start;
@@ -93,7 +106,16 @@ namespace PaperFootball.Tabletop.Match
                 }
                 else
                 {
-                    ResolveCurrentFlick(FlickResolutionType.FellFromTable);
+                    ResolveStoppedFootball(true);
+                }
+            }
+
+            if (match.Phase == MatchPhase.FieldGoalAttempt)
+            {
+                fieldGoalAttemptTimer += Time.deltaTime;
+                if (fieldGoalAttemptTimer >= rules.fieldGoalTimeLimit)
+                {
+                    ResolveCurrentFieldGoal(false);
                 }
             }
         }
@@ -162,11 +184,22 @@ namespace PaperFootball.Tabletop.Match
             footballPhysics?.Configure(rules);
             restDetector?.Configure(rules);
             inputReader?.SetRules(rules);
+            overhangDebugOverlay?.Configure(this, null);
+            trajectoryPreview?.Configure(footballPhysics != null ? footballPhysics.Rigidbody : null, rules);
         }
 
         private void OnDragChanged(FlickCommand command)
         {
             hud?.RenderFlick(command);
+
+            if (match != null && match.Phase == MatchPhase.FieldGoalSetup)
+            {
+                aimIndicator?.Hide();
+                PreviewFieldGoalKick(command);
+                return;
+            }
+
+            trajectoryPreview?.Hide();
             if (command.IsValid)
             {
                 aimIndicator?.Show(command);
@@ -182,6 +215,7 @@ namespace PaperFootball.Tabletop.Match
             if (match == null || !command.IsValid)
             {
                 aimIndicator?.Hide();
+                trajectoryPreview?.Hide();
                 return;
             }
 
@@ -193,11 +227,38 @@ namespace PaperFootball.Tabletop.Match
 
             if (match.Phase == MatchPhase.FieldGoalSetup)
             {
-                BeginFieldGoalAttempt(command);
+                TryLaunchFieldGoalKick(command);
                 return;
             }
 
             aimIndicator?.Hide();
+            trajectoryPreview?.Hide();
+        }
+
+        public FieldGoalKickResult PreviewFieldGoalKick(FlickCommand command)
+        {
+            FieldGoalKickResult kick = FieldGoalKickCalculator.Calculate(command, rules);
+            if (match == null || match.Phase != MatchPhase.FieldGoalSetup || !kick.IsValid)
+            {
+                trajectoryPreview?.Hide();
+                return kick;
+            }
+
+            trajectoryPreview?.Show(kick);
+            return kick;
+        }
+
+        public bool TryLaunchFieldGoalKick(FlickCommand command)
+        {
+            FieldGoalKickResult kick = FieldGoalKickCalculator.Calculate(command, rules);
+            if (!kick.IsValid || match == null || match.Phase != MatchPhase.FieldGoalSetup)
+            {
+                trajectoryPreview?.Hide();
+                return false;
+            }
+
+            BeginFieldGoalAttempt(kick);
+            return true;
         }
 
         private void BeginNormalFlick(FlickCommand command)
@@ -216,20 +277,22 @@ namespace PaperFootball.Tabletop.Match
             Render();
         }
 
-        private void BeginFieldGoalAttempt(FlickCommand command)
+        private void BeginFieldGoalAttempt(FieldGoalKickResult kick)
         {
             if (!match.TryBeginFieldGoalAttempt())
             {
                 aimIndicator?.Hide();
+                trajectoryPreview?.Hide();
                 return;
             }
 
             fieldGoalController?.BeginAttempt(match.CurrentPlayer);
             fellResolved = false;
+            fieldGoalAttemptTimer = 0f;
             restDetector?.ResetDetector();
-            float upwardImpulse = Mathf.Max(2f, command.Force * 0.35f);
-            footballPhysics?.Flick(command, upwardImpulse);
+            footballPhysics?.KickFieldGoal(kick);
             aimIndicator?.Hide();
+            trajectoryPreview?.Hide();
             Render();
         }
 
@@ -242,7 +305,7 @@ namespace PaperFootball.Tabletop.Match
 
             if (match.Phase == MatchPhase.FootballMoving)
             {
-                ResolveStoppedFootball();
+                ResolveStoppedFootball(false);
             }
             else if (match.Phase == MatchPhase.FieldGoalAttempt)
             {
@@ -250,7 +313,7 @@ namespace PaperFootball.Tabletop.Match
             }
         }
 
-        private void ResolveStoppedFootball()
+        private void ResolveStoppedFootball(bool forceFell)
         {
             if (tableBoundary == null || footballCollider == null)
             {
@@ -258,14 +321,17 @@ namespace PaperFootball.Tabletop.Match
                 return;
             }
 
-            EdgeOverhangResult overhang = EdgeOverhangCalculator.Calculate(
+            bool footballFell = forceFell || tableBoundary.HasFallen(footballPhysics != null ? footballPhysics.transform : null);
+            OverhangDebugSnapshot snapshot = EdgeOverhangCalculator.CalculateSnapshot(
                 tableBoundary.TableBounds,
                 footballCollider.bounds,
                 match.CurrentPlayer,
-                rules);
+                rules,
+                footballFell,
+                match.CurrentFlickResolved);
 
-            bool footballFell = tableBoundary.HasFallen(footballPhysics != null ? footballPhysics.transform : null);
-            FlickResolutionType resolution = PaperFootballRules.ResolveStoppedFootball(footballFell, overhang);
+            PublishOverhangSnapshot(snapshot);
+            FlickResolutionType resolution = PaperFootballRules.ResolveStoppedFootball(footballFell, snapshot.ToOverhangResult());
             ResolveCurrentFlick(resolution);
         }
 
@@ -273,6 +339,7 @@ namespace PaperFootball.Tabletop.Match
         {
             match.TryBeginResolving();
             match.ApplyResolution(resolution);
+            MarkLatestOverhangProcessed();
 
             if (resolution == FlickResolutionType.FellFromTable || resolution == FlickResolutionType.Touchdown)
             {
@@ -308,6 +375,7 @@ namespace PaperFootball.Tabletop.Match
 
             fieldGoalController?.EndAttempt();
             match.ApplyFieldGoalResult(successful);
+            fieldGoalAttemptTimer = 0f;
             ResetBallToCurrentPlayerStart();
             Render();
         }
@@ -330,6 +398,7 @@ namespace PaperFootball.Tabletop.Match
         private void OnNewMatchRequested()
         {
             match?.ResetMatch();
+            trajectoryPreview?.Hide();
             ResetBallToCurrentPlayerStart();
             Render();
         }
@@ -337,6 +406,7 @@ namespace PaperFootball.Tabletop.Match
         private void OnCancelRequested()
         {
             aimIndicator?.Hide();
+            trajectoryPreview?.Hide();
         }
 
         private void ResetBallToCurrentPlayerStart()
@@ -381,6 +451,23 @@ namespace PaperFootball.Tabletop.Match
             }
 
             hud?.Render(match);
+        }
+
+        private void PublishOverhangSnapshot(OverhangDebugSnapshot snapshot)
+        {
+            latestOverhangSnapshot = snapshot;
+            OverhangSnapshotChanged?.Invoke(snapshot);
+        }
+
+        private void MarkLatestOverhangProcessed()
+        {
+            if (!latestOverhangSnapshot.HasValue || match == null)
+            {
+                return;
+            }
+
+            latestOverhangSnapshot = latestOverhangSnapshot.Value.WithScoringEventProcessed(match.CurrentFlickResolved);
+            OverhangSnapshotChanged?.Invoke(latestOverhangSnapshot.Value);
         }
     }
 }

@@ -27,6 +27,47 @@ namespace PaperFootball.Tabletop.Scoring
             ScoringEdge edge,
             PaperFootballRuleSet rules)
         {
+            return CalculateSnapshot(
+                tableBounds,
+                footballBounds,
+                edge,
+                rules,
+                PaperFootballPlayer.PlayerOne,
+                false,
+                false).ToOverhangResult();
+        }
+
+        public static OverhangDebugSnapshot CalculateSnapshot(
+            Bounds tableBounds,
+            Bounds footballBounds,
+            PaperFootballPlayer attackingPlayer,
+            PaperFootballRuleSet rules,
+            bool footballFell,
+            bool scoringEventAlreadyProcessed)
+        {
+            ScoringEdge edge = attackingPlayer == PaperFootballPlayer.PlayerOne
+                ? ScoringEdge.PositiveZ
+                : ScoringEdge.NegativeZ;
+
+            return CalculateSnapshot(
+                tableBounds,
+                footballBounds,
+                edge,
+                rules,
+                attackingPlayer,
+                footballFell,
+                scoringEventAlreadyProcessed);
+        }
+
+        public static OverhangDebugSnapshot CalculateSnapshot(
+            Bounds tableBounds,
+            Bounds footballBounds,
+            ScoringEdge edge,
+            PaperFootballRuleSet rules,
+            PaperFootballPlayer attackingPlayer,
+            bool footballFell,
+            bool scoringEventAlreadyProcessed)
+        {
             PaperFootballRuleSet runtimeRules = rules ?? new PaperFootballRuleSet();
             runtimeRules.Sanitize();
 
@@ -52,12 +93,28 @@ namespace PaperFootball.Tabletop.Scoring
             float supportedPercent = Mathf.Min(supportedDepthPercent, supportedWidthPercent);
             float overhangPercent = Mathf.Clamp01(overhangDistance / footballLength);
             float requiredOverhang = runtimeRules.touchdownRequiresOverhang ? runtimeRules.requiredOverhangPercent : 0.0001f;
+            bool hasPositiveOverhang = overhangDistance > 0f;
+            bool isSupported = supportedPercent >= runtimeRules.minimumSupportedPercent;
 
             bool isTouchdown = overhangPercent >= requiredOverhang &&
-                               supportedPercent >= runtimeRules.minimumSupportedPercent &&
-                               overhangDistance > 0f;
+                               isSupported &&
+                               hasPositiveOverhang;
 
-            return new EdgeOverhangResult(isTouchdown, overhangPercent, supportedPercent, overhangDistance, edge);
+            return new OverhangDebugSnapshot(
+                attackingPlayer,
+                edge,
+                footballBounds,
+                tableBounds,
+                overhangDistance,
+                overhangPercent,
+                supportedPercent,
+                isSupported,
+                footballFell,
+                hasPositiveOverhang,
+                requiredOverhang,
+                runtimeRules.minimumSupportedPercent,
+                isTouchdown,
+                scoringEventAlreadyProcessed);
         }
     }
 }

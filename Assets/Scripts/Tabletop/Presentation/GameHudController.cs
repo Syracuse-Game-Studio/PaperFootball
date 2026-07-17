@@ -53,7 +53,7 @@ namespace PaperFootball.Tabletop.Presentation
             SetText(fieldGoalModeText, $"Field goal: {(match.IsFieldGoalMode ? "On" : "Off")}");
             SetText(lastResultText, $"Last: {match.LastResult}");
             SetText(possessionText, $"Possession: {match.PossessionNumber}");
-            SetText(controlsText, "Left mouse: drag/release | Touchdown opens field-goal kick | R: reset ball | N: new match | Esc: cancel");
+            SetText(controlsText, "Left mouse: drag/release | Field goal shows arc | R: reset ball | N: new match | Esc: cancel | F3: diagnostics");
         }
 
         public void RenderFlick(FlickCommand command)
