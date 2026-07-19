@@ -1,5 +1,7 @@
 # Paper Football Prototype Notes
 
+> Consolidated note: use `Assets/Docs/PaperFootballConsolidatedHandoffReport.md` as the current single intake report. This file is retained for historical detail.
+
 ## Primary Workflow
 
 Use `Assets/Scenes/PaperFootballLauncher.unity` as the prototype entry scene. It opens the new tabletop prototype while keeping the existing `MainMenu.unity` and `TableScene.unity` available as legacy scenes.

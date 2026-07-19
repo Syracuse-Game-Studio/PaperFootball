@@ -1,5 +1,7 @@
 # Paper Football Codex Implementation Report
 
+> Consolidated note: use `Assets/Docs/PaperFootballConsolidatedHandoffReport.md` as the current single intake report. This file is retained for historical detail.
+
 Date prepared: 2026-07-17
 
 ## Purpose

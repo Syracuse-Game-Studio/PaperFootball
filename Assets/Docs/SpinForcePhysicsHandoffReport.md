@@ -1,5 +1,7 @@
 # Paper Football Spin And Force Handoff Report
 
+> Consolidated note: use `Assets/Docs/PaperFootballConsolidatedHandoffReport.md` as the current single intake report. This file is retained for historical detail.
+
 Date prepared: 2026-07-18
 Project path: `G:\Unity\Games\PaperFootball`
 Unity version: `6000.0.68f1`
