@@ -181,6 +181,28 @@ namespace PaperFootball.Tabletop.Rules
             return player == PaperFootballPlayer.PlayerOne ? PlayerOneScore : PlayerTwoScore;
         }
 
+        public void AddBonusScore(PaperFootballPlayer player, int points, string reason)
+        {
+            if (points <= 0 || stateMachine.CurrentPhase == MatchPhase.MatchComplete)
+            {
+                return;
+            }
+
+            AddScore(player, points);
+            LastResult = string.IsNullOrWhiteSpace(reason)
+                ? $"{GetPlayerName(player)} bonus score"
+                : reason;
+
+            if (HasWon(player) || HasReachedPossessionLimit())
+            {
+                Winner = player;
+                stateMachine.TransitionTo(MatchPhase.MatchComplete);
+                LastResult = $"{GetPlayerName(player)} wins";
+            }
+
+            StateChanged?.Invoke();
+        }
+
         public static PaperFootballPlayer OpponentOf(PaperFootballPlayer player)
         {
             return player == PaperFootballPlayer.PlayerOne ? PaperFootballPlayer.PlayerTwo : PaperFootballPlayer.PlayerOne;

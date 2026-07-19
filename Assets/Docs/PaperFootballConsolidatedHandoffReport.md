@@ -12,6 +12,7 @@ This is the single intake report for the current tabletop paper football prototy
 - `Assets/Docs/SpinForcePhysicsHandoffReport.md`
 - `Assets/Docs/RoguelikeFlickSystemHandoffReport.md`
 - `Assets/Docs/PaperFootballPrototypeNotes.md`
+- `Assets/Docs/RoguelikePhase2HandoffReport.md`
 
 Read this file first. The older reports are retained for history, but this is the current combined state.
 
@@ -25,6 +26,26 @@ Read this file first. The older reports are retained for history, but this is th
 - Validation runner: `Assets/Editor/PaperFootballValidationRunner.cs`
 
 Existing legacy scenes such as `MainMenu.unity` and `TableScene.unity` are still retained.
+
+## Phase 2 Roguelike Foundation
+
+Phase 2 adds a roguelike run foundation without replacing local match mode. See `Assets/Docs/RoguelikePhase2HandoffReport.md` for the detailed handoff.
+
+Implemented:
+
+- deterministic run random streams
+- seeded force, direction, and contact-point shot variance
+- uncertainty preview UI
+- upgrade/modifier framework with five starter upgrades
+- three opponent profiles using shared `FlickCommand` physics
+- deterministic six-encounter run generation
+- normal, slippery, rough, and science-lab table surfaces
+- obstacle layouts, precision target zone, and boss desk-shake hooks
+- run state, rewards, victory/defeat summary, and JSON snapshot foundation
+- launcher entry for Local Match, Roguelike Run, and Quit
+- scaffolder creation of run controllers, catalogs, assets, and UI
+
+Validation note: Unity batch validation for Phase 2 was attempted but blocked by licensing/package entitlement reconnect loops before compiler/test results were produced. Do not treat Phase 2 Unity validation as passed until rerun successfully.
 
 ## Gameplay Implemented
 
@@ -251,7 +272,8 @@ Known validation notes:
 - Field-goal aiming still uses drag input plus computed upward impulse, not a dedicated kick UI.
 - Goal-mouth detection is a simple trigger between uprights/above crossbar.
 - Scene validation checks required references and camera framing, not full end-to-end gameplay simulation.
-- No AI, online multiplayer, roguelike run progression, upgrades, encounters, or seeded shot variance yet.
+- Roguelike Phase 2 is implemented as a prototype foundation, but Unity validation is currently blocked by licensing/package entitlement reconnect loops.
+- Consumable placement has runtime foundations but not a full player-facing placement flow yet.
 - No dedicated replay system.
 
 ## Current Worktree
@@ -266,4 +288,4 @@ The active tabletop prototype uses `PaperFootball.Tabletop.Physics.FootballPhysi
 2. If flicks still go too far at low strength, increase `flickForceResponseExponent` or lower `maximumFlickForce`.
 3. Add a better triangle or compound collider for more accurate contact and overhang.
 4. Replace functional placeholder fold/corner marks with final paper art.
-5. Start Phase 2 roguelike work: seeded shot variance, modifiers/upgrades, opponent behaviors, and run UI.
+5. Rerun Unity validation after the licensing/package entitlement issue is resolved, then tune the roguelike run loop in editor playtests.

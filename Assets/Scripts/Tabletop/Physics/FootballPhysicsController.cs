@@ -19,6 +19,12 @@ namespace PaperFootball.Tabletop.Physics
         private PendingImpulse pendingImpulse;
         private bool hasPendingImpulse;
         private float debugLineExpiresAt;
+        private bool isTrackingFlick;
+        private Vector3 trackedLastPosition;
+        private float trackedLastYaw;
+        private float trackedTotalYawDegrees;
+        private float trackedTravelDistance;
+        private float trackedPeakYawVelocity;
 
         public Rigidbody Rigidbody => body;
         public bool IsMoving => body != null &&
@@ -30,6 +36,9 @@ namespace PaperFootball.Tabletop.Physics
         public Vector3 LastAppliedImpulse { get; private set; }
         public Vector3 LastAppliedYawTorqueImpulse { get; private set; }
         public float LastContactLeverArmDistance { get; private set; }
+        public float LastFlickTotalYawDegrees { get; private set; }
+        public float LastFlickPeakYawVelocity { get; private set; }
+        public float LastFlickTravelDistance { get; private set; }
         public float AngularDamping => body != null ? body.angularDamping : angularDamping;
         public float ContactYawTorqueMultiplier => contactYawTorqueMultiplier;
 
@@ -81,6 +90,36 @@ namespace PaperFootball.Tabletop.Physics
             QueueImpulse(result.TotalImpulse, result.HasContactPoint, result.ContactPointWorld);
         }
 
+        public void ApplyExternalImpulse(Vector3 impulse)
+        {
+            if (body == null || impulse.sqrMagnitude <= 0.000001f)
+            {
+                return;
+            }
+
+            QueueImpulse(impulse, false, body.worldCenterOfMass, false);
+        }
+
+        public void ApplyExternalImpulseAtPoint(Vector3 impulse, Vector3 worldPoint)
+        {
+            if (body == null || impulse.sqrMagnitude <= 0.000001f)
+            {
+                return;
+            }
+
+            QueueImpulse(impulse, true, worldPoint, false);
+        }
+
+        public void SetCenterOfMassOffset(Vector3 localOffset)
+        {
+            if (body == null)
+            {
+                body = GetComponent<Rigidbody>();
+            }
+
+            body.centerOfMass = localOffset;
+        }
+
         public void Stop()
         {
             if (body == null)
@@ -93,6 +132,7 @@ namespace PaperFootball.Tabletop.Physics
             body.angularVelocity = Vector3.zero;
             body.Sleep();
             ClearLastImpulseDebug();
+            StopTrackingFlick();
         }
 
         public void PlaceAt(Vector3 position, Quaternion rotation)
@@ -115,6 +155,7 @@ namespace PaperFootball.Tabletop.Physics
             body.Sleep();
             transform.SetPositionAndRotation(position, rotation);
             ClearLastImpulseDebug();
+            StopTrackingFlick();
         }
 
         private void Awake()
@@ -128,6 +169,7 @@ namespace PaperFootball.Tabletop.Physics
         {
             if (!hasPendingImpulse || body == null)
             {
+                UpdateFlickTracking();
                 DrawLastImpulseDebugLine();
                 return;
             }
@@ -135,6 +177,7 @@ namespace PaperFootball.Tabletop.Physics
             PendingImpulse impulse = pendingImpulse;
             hasPendingImpulse = false;
             ApplyImpulse(impulse);
+            UpdateFlickTracking();
             DrawLastImpulseDebugLine();
         }
 
@@ -152,9 +195,9 @@ namespace PaperFootball.Tabletop.Physics
                 : RigidbodyConstraints.None;
         }
 
-        private void QueueImpulse(Vector3 impulse, bool applyAtContactPoint, Vector3 contactPointWorld)
+        private void QueueImpulse(Vector3 impulse, bool applyAtContactPoint, Vector3 contactPointWorld, bool trackAsFlick = true)
         {
-            pendingImpulse = new PendingImpulse(impulse, applyAtContactPoint, contactPointWorld);
+            pendingImpulse = new PendingImpulse(impulse, applyAtContactPoint, contactPointWorld, trackAsFlick);
             hasPendingImpulse = true;
             body.WakeUp();
         }
@@ -162,6 +205,10 @@ namespace PaperFootball.Tabletop.Physics
         private void ApplyImpulse(PendingImpulse impulse)
         {
             body.WakeUp();
+            if (impulse.TrackAsFlick)
+            {
+                BeginTrackingFlick();
+            }
 
             if (!impulse.ApplyAtContactPoint)
             {
@@ -248,18 +295,64 @@ namespace PaperFootball.Tabletop.Physics
             Debug.DrawLine(LastCenterOfMassWorld, LastAppliedContactPointWorld, Color.yellow, 0f, false);
         }
 
+        private void BeginTrackingFlick()
+        {
+            isTrackingFlick = true;
+            trackedLastPosition = body.position;
+            trackedLastYaw = body.rotation.eulerAngles.y;
+            trackedTotalYawDegrees = 0f;
+            trackedTravelDistance = 0f;
+            trackedPeakYawVelocity = 0f;
+            LastFlickTotalYawDegrees = 0f;
+            LastFlickTravelDistance = 0f;
+            LastFlickPeakYawVelocity = 0f;
+        }
+
+        private void UpdateFlickTracking()
+        {
+            if (!isTrackingFlick || body == null)
+            {
+                return;
+            }
+
+            Vector3 currentPosition = body.position;
+            trackedTravelDistance += Vector3.Distance(
+                new Vector3(trackedLastPosition.x, 0f, trackedLastPosition.z),
+                new Vector3(currentPosition.x, 0f, currentPosition.z));
+            trackedLastPosition = currentPosition;
+
+            float currentYaw = body.rotation.eulerAngles.y;
+            trackedTotalYawDegrees += Mathf.DeltaAngle(trackedLastYaw, currentYaw);
+            trackedLastYaw = currentYaw;
+            trackedPeakYawVelocity = Mathf.Max(trackedPeakYawVelocity, Mathf.Abs(body.angularVelocity.y));
+
+            LastFlickTotalYawDegrees = trackedTotalYawDegrees;
+            LastFlickTravelDistance = trackedTravelDistance;
+            LastFlickPeakYawVelocity = trackedPeakYawVelocity;
+        }
+
+        private void StopTrackingFlick()
+        {
+            isTrackingFlick = false;
+            trackedTotalYawDegrees = 0f;
+            trackedTravelDistance = 0f;
+            trackedPeakYawVelocity = 0f;
+        }
+
         private readonly struct PendingImpulse
         {
-            public PendingImpulse(Vector3 force, bool applyAtContactPoint, Vector3 contactPointWorld)
+            public PendingImpulse(Vector3 force, bool applyAtContactPoint, Vector3 contactPointWorld, bool trackAsFlick)
             {
                 Force = force;
                 ApplyAtContactPoint = applyAtContactPoint;
                 ContactPointWorld = contactPointWorld;
+                TrackAsFlick = trackAsFlick;
             }
 
             public Vector3 Force { get; }
             public bool ApplyAtContactPoint { get; }
             public Vector3 ContactPointWorld { get; }
+            public bool TrackAsFlick { get; }
         }
     }
 }

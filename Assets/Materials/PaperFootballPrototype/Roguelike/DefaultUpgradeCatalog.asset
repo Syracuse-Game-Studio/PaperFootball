@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: DefaultUpgradeCatalog
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Modifiers:UpgradeCatalog
+  upgrades:
+  - {fileID: 11400000, guid: 3ed89ce21c617de42a9d18016fc1c498, type: 2}
+  - {fileID: 11400000, guid: 379ae0a83fe06f648b8e76b8d1a07d29, type: 2}
+  - {fileID: 11400000, guid: f33bb0a41eaec3d469671c3f2ae103b4, type: 2}
+  - {fileID: 11400000, guid: d1c8a9494b830054d9e88f3cbde5d74d, type: 2}
+  - {fileID: 11400000, guid: ab92da22c8a7b7249ad09f5d27fb46b5, type: 2}

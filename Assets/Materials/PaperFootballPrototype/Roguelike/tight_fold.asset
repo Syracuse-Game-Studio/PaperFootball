@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: tight_fold
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Modifiers:FootballUpgradeDefinition
+  stableId: tight_fold
+  displayName: Tight Fold
+  description: Cleaner creases reduce contact and direction uncertainty, with slightly
+    calmer spin.
+  rarity: 0
+  icon: {fileID: 0}
+  maximumStackCount: 3
+  modifiers:
+  - stableId: tight_fold.contact
+    modifierType: 4
+    operation: 1
+    value: 0.65
+    priority: 0
+  - stableId: tight_fold.direction
+    modifierType: 3
+    operation: 1
+    value: 0.75
+    priority: 0
+  - stableId: tight_fold.spin
+    modifierType: 5
+    operation: 1
+    value: 0.9
+    priority: 0
+  tags:
+  - fold
+  - control
+  mutualExclusionTags: []
+  rewardWeight: 1.2

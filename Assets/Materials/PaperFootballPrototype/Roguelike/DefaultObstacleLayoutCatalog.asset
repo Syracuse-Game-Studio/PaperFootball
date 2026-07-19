@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: DefaultObstacleLayoutCatalog
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Encounters:ObstacleLayoutCatalog
+  layouts:
+  - {fileID: 11400000, guid: 62f165962da0999408050638abb7c867, type: 2}
+  - {fileID: 11400000, guid: 7d87a367b7a54d2469ebdaddfe73dcd3, type: 2}
+  - {fileID: 11400000, guid: ca4f54dd94a6e334db1ed2ddfd775614, type: 2}
+  - {fileID: 11400000, guid: 0792da859a60bf346b0c423be71f203d, type: 2}
+  - {fileID: 11400000, guid: e282cbf7142b0b14eb597ab3c9ff9c90, type: 2}

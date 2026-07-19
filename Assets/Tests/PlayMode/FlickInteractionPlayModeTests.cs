@@ -61,6 +61,47 @@ namespace PaperFootball.Tabletop.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator ContactSelectionTargetsFootballBehindGoalpostColliders()
+        {
+            GameObject football = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject goalTrigger = new("GoalMouthTrigger");
+            GameObject upright = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject selectorObject = new("ContactPointSelector");
+
+            try
+            {
+                football.transform.position = new Vector3(0f, 0f, 5f);
+                Collider footballCollider = football.GetComponent<Collider>();
+
+                BoxCollider triggerCollider = goalTrigger.AddComponent<BoxCollider>();
+                triggerCollider.isTrigger = true;
+                goalTrigger.transform.position = new Vector3(0f, 0f, 2f);
+                goalTrigger.transform.localScale = new Vector3(2f, 2f, 0.25f);
+
+                upright.transform.position = new Vector3(0f, 0f, 3f);
+                upright.transform.localScale = new Vector3(0.2f, 2f, 0.2f);
+
+                ContactPointSelector selector = selectorObject.AddComponent<ContactPointSelector>();
+                selector.Configure(null, footballCollider);
+                UnityEngine.Physics.SyncTransforms();
+
+                bool selected = selector.TrySelectFromRay(new Ray(Vector3.zero, Vector3.forward), out SelectedContactPoint contactPoint);
+
+                Assert.IsTrue(selected);
+                Assert.That(contactPoint.Collider, Is.EqualTo(footballCollider));
+            }
+            finally
+            {
+                Object.Destroy(selectorObject);
+                Object.Destroy(upright);
+                Object.Destroy(goalTrigger);
+                Object.Destroy(football);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ContactSelectionIsDisabledDuringResolution()
         {
             InteractionFixture fixture = InteractionFixture.Create();

@@ -22,6 +22,7 @@ namespace PaperFootball.Tabletop.Input
         private PaperFootballPlayer? lastPlayer;
         private MatchPhase? lastPhase;
         private bool isSubscribed;
+        private bool inputSuppressed;
 
         public FlickInteractionState State => stateMachine.CurrentState;
         public bool HasSelectedContactPoint => hasSelectedContactPoint;
@@ -120,6 +121,28 @@ namespace PaperFootball.Tabletop.Input
             flickInputReader?.ClearContactPointOverride();
         }
 
+        public void SetInputSuppressed(bool suppressed)
+        {
+            inputSuppressed = suppressed;
+            if (inputSuppressed)
+            {
+                if (flickInputReader != null)
+                {
+                    flickInputReader.InputEnabled = false;
+                    flickInputReader.CancelDrag();
+                }
+
+                if (contactPointSelector != null)
+                {
+                    contactPointSelector.InputEnabled = false;
+                }
+            }
+            else
+            {
+                ApplyStateSideEffects();
+            }
+        }
+
         public bool TryConfirmContactPoint(SelectedContactPoint contactPoint)
         {
             if (State != FlickInteractionState.SelectingContact && State != FlickInteractionState.WaitingForContact)
@@ -155,6 +178,11 @@ namespace PaperFootball.Tabletop.Input
 
         private void Update()
         {
+            if (inputSuppressed)
+            {
+                return;
+            }
+
             if (State == FlickInteractionState.WaitingForFlick && hasSelectedContactPoint)
             {
                 RefreshInputOverride();
@@ -375,14 +403,16 @@ namespace PaperFootball.Tabletop.Input
         {
             if (contactPointSelector != null)
             {
-                contactPointSelector.InputEnabled = State == FlickInteractionState.WaitingForContact ||
-                                                    State == FlickInteractionState.SelectingContact;
+                contactPointSelector.InputEnabled = !inputSuppressed &&
+                                                    (State == FlickInteractionState.WaitingForContact ||
+                                                     State == FlickInteractionState.SelectingContact);
             }
 
             if (flickInputReader != null)
             {
-                flickInputReader.InputEnabled = State == FlickInteractionState.WaitingForFlick ||
-                                                State == FlickInteractionState.SelectingFlick;
+                flickInputReader.InputEnabled = !inputSuppressed &&
+                                                (State == FlickInteractionState.WaitingForFlick ||
+                                                 State == FlickInteractionState.SelectingFlick);
             }
         }
 

@@ -6,6 +6,13 @@ using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.Match;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Presentation;
+using PaperFootball.Tabletop.Roguelike.Consumables;
+using PaperFootball.Tabletop.Roguelike.Encounters;
+using PaperFootball.Tabletop.Roguelike.Modifiers;
+using PaperFootball.Tabletop.Roguelike.Opponents;
+using PaperFootball.Tabletop.Roguelike.Presentation;
+using PaperFootball.Tabletop.Roguelike.Run;
+using PaperFootball.Tabletop.Roguelike.Variance;
 using PaperFootball.Tabletop.Rules;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -23,6 +30,12 @@ namespace PaperFootball.Editor
         private const string LauncherScenePath = "Assets/Scenes/PaperFootballLauncher.unity";
         private const string GeneratedFolder = "Assets/Materials/PaperFootballPrototype";
         private const string ConfigPath = "Assets/Materials/PaperFootballPrototype/DefaultPaperFootballConfig.asset";
+        private const string RoguelikeFolder = "Assets/Materials/PaperFootballPrototype/Roguelike";
+        private const string ShotVariancePath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultShotVarianceSettings.asset";
+        private const string UpgradeCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultUpgradeCatalog.asset";
+        private const string OpponentCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultOpponentCatalog.asset";
+        private const string SurfaceCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultTableSurfaceCatalog.asset";
+        private const string ObstacleCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultObstacleLayoutCatalog.asset";
 
         private static readonly Vector3 TableScale = new(8f, 0.24f, 12f);
         private const float TableTopY = 0.12f;
@@ -40,6 +53,11 @@ namespace PaperFootball.Editor
                 : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             PaperFootballConfig config = GetOrCreateConfig();
+            ShotVarianceSettings shotVarianceSettings = GetOrCreateShotVarianceSettings();
+            UpgradeCatalog upgradeCatalog = GetOrCreateUpgradeCatalog();
+            OpponentCatalog opponentCatalog = GetOrCreateOpponentCatalog();
+            TableSurfaceCatalog surfaceCatalog = GetOrCreateSurfaceCatalog();
+            ObstacleLayoutCatalog obstacleCatalog = GetOrCreateObstacleLayoutCatalog();
             Material tableMaterial = GetOrCreateMaterial("Table.mat", new Color(0.42f, 0.26f, 0.13f));
             Material floorMaterial = GetOrCreateMaterial("Floor.mat", new Color(0.12f, 0.13f, 0.15f));
             Material footballMaterial = GetOrCreateMaterial("PaperFootball.mat", new Color(0.96f, 0.95f, 0.86f));
@@ -49,6 +67,11 @@ namespace PaperFootball.Editor
             Material edgeTwoMaterial = GetOrCreateMaterial("PlayerTwoEdge.mat", new Color(1f, 0.35f, 0.24f, 0.85f));
             Material indicatorMaterial = GetOrCreateMaterial("AimIndicator.mat", new Color(0.1f, 0.95f, 0.75f));
             Material contactMarkerMaterial = GetOrCreateMaterial("ContactMarker.mat", new Color(1f, 0.82f, 0.12f));
+            Material uncertaintyMaterial = GetOrCreateMaterial("UncertaintyPreview.mat", new Color(0.95f, 0.85f, 0.18f));
+            Material targetMaterial = GetOrCreateMaterial("PrecisionTarget.mat", new Color(0.2f, 0.85f, 0.32f, 0.55f));
+            Material obstacleMaterial = GetOrCreateMaterial("EncounterObstacle.mat", new Color(0.18f, 0.16f, 0.14f));
+            Material tapeMaterial = GetOrCreateMaterial("TapeFrictionPatch.mat", new Color(0.9f, 0.88f, 0.62f, 0.7f));
+            Material eraserMaterial = GetOrCreateMaterial("EraserBlocker.mat", new Color(0.95f, 0.35f, 0.45f));
             PhysicsMaterial footballPhysicsMaterial = GetOrCreatePhysicsMaterial();
 
             GameObject root = GetOrCreateRoot("PaperFootballPrototype");
@@ -172,6 +195,31 @@ namespace PaperFootball.Editor
             FootballSpinDebugOverlay spinDebugOverlay = ConfigureSpinDebugOverlay(hud.transform, physicsController);
             ContactPointIndicator contactIndicator = ConfigureContactPointIndicator(root.transform, hud.transform, contactMarkerMaterial, indicatorMaterial);
 
+            GameObject shotVarianceObject = GetOrCreateChild("ShotVarianceController", root.transform);
+            ShotVarianceController shotVarianceController = EnsureComponent<ShotVarianceController>(shotVarianceObject);
+            shotVarianceController.Configure(shotVarianceSettings, footballCollider, 12345);
+            shotVarianceController.SetVarianceEnabled(false);
+
+            ShotUncertaintyPreview uncertaintyPreview = ConfigureShotUncertaintyPreview(
+                root.transform,
+                hud.transform,
+                uncertaintyMaterial,
+                contactSelector,
+                shotVarianceController);
+
+            TableSurfaceApplier surfaceApplier = EnsureComponent<TableSurfaceApplier>(table);
+            surfaceApplier.Configure(tableCollider, table.GetComponent<Renderer>());
+
+            GameObject obstacleRoot = GetOrCreateChild("EncounterObstacles", root.transform);
+            ObstacleLayoutController obstacleLayoutController = EnsureComponent<ObstacleLayoutController>(obstacleRoot);
+            obstacleLayoutController.Configure(obstacleRoot.transform, obstacleMaterial);
+
+            GameObject temporaryRoot = GetOrCreateChild("TemporaryEncounterPlacements", root.transform);
+            TemporaryPlacementController temporaryPlacementController = EnsureComponent<TemporaryPlacementController>(temporaryRoot);
+            temporaryPlacementController.Configure(temporaryRoot.transform, tableCollider, footballCollider, tapeMaterial, eraserMaterial);
+
+            PrecisionTargetZone precisionTargetZone = ConfigurePrecisionTargetZone(root.transform, targetMaterial);
+
             GameObject fieldGoalObject = GetOrCreateChild("FieldGoalController", root.transform);
             FieldGoalController fieldGoalController = EnsureComponent<FieldGoalController>(fieldGoalObject);
             fieldGoalController.Configure(
@@ -207,10 +255,53 @@ namespace PaperFootball.Editor
                 footballCollider,
                 playerOneStart.transform,
                 playerTwoStart.transform,
-                flickInteraction);
+                flickInteraction,
+                shotVarianceController,
+                uncertaintyPreview);
+
+            GameObject opponentObject = GetOrCreateChild("OpponentTurnController", root.transform);
+            OpponentTurnController opponentTurnController = EnsureComponent<OpponentTurnController>(opponentObject);
+            opponentTurnController.Configure(matchController, physicsController, footballCollider, contactIndicator, indicator);
+            opponentTurnController.SetAiEnabled(false);
+
+            RunProgressionUiController runUi = ConfigureRunUi(root.transform);
+
+            GameObject runObject = GetOrCreateChild("RunController", root.transform);
+            RunController runController = EnsureComponent<RunController>(runObject);
+            runController.Configure(
+                upgradeCatalog,
+                opponentCatalog,
+                surfaceCatalog,
+                obstacleCatalog,
+                matchController,
+                physicsController,
+                shotVarianceController,
+                opponentTurnController,
+                surfaceApplier,
+                obstacleLayoutController,
+                temporaryPlacementController,
+                precisionTargetZone,
+                runUi);
+
+            RoguelikeDebugOverlay roguelikeDebugOverlay = ConfigureRoguelikeDebugOverlay(
+                hud.transform,
+                runController,
+                shotVarianceController,
+                opponentTurnController,
+                surfaceApplier,
+                obstacleLayoutController);
+
+            GameObject devCommandsObject = GetOrCreateChild("RunDevelopmentCommands", root.transform);
+            RunDevelopmentCommands devCommands = EnsureComponent<RunDevelopmentCommands>(devCommandsObject);
+            devCommands.Configure(runController, shotVarianceController, true);
 
             MarkDirty(
                 config,
+                shotVarianceSettings,
+                upgradeCatalog,
+                opponentCatalog,
+                surfaceCatalog,
+                obstacleCatalog,
                 table,
                 floor,
                 playerOneEdge,
@@ -225,13 +316,23 @@ namespace PaperFootball.Editor
                 boundaryObject,
                 indicatorObject,
                 trajectoryObject,
+                shotVarianceObject,
+                uncertaintyPreview.gameObject,
+                obstacleRoot,
+                temporaryRoot,
+                precisionTargetZone.gameObject,
                 overhangDebugOverlay.gameObject,
                 spinDebugOverlay.gameObject,
+                roguelikeDebugOverlay.gameObject,
                 contactIndicator.gameObject,
                 fieldGoalObject,
                 interactionObject,
                 hud.gameObject,
-                matchObject);
+                matchObject,
+                opponentObject,
+                runUi.gameObject,
+                runObject,
+                devCommandsObject);
 
             if (string.IsNullOrEmpty(scene.path))
             {
@@ -272,6 +373,264 @@ namespace PaperFootball.Editor
             {
                 AssetDatabase.CreateFolder("Assets/Materials", "PaperFootballPrototype");
             }
+
+            if (!AssetDatabase.IsValidFolder(RoguelikeFolder))
+            {
+                AssetDatabase.CreateFolder(GeneratedFolder, "Roguelike");
+            }
+        }
+
+        private static ShotVarianceSettings GetOrCreateShotVarianceSettings()
+        {
+            ShotVarianceSettings settings = GetOrCreateScriptableObject<ShotVarianceSettings>(ShotVariancePath);
+            settings.Configure(true, 0.03f, 1.5f, 0.0075f, false, "Stable");
+            EditorUtility.SetDirty(settings);
+            return settings;
+        }
+
+        private static UpgradeCatalog GetOrCreateUpgradeCatalog()
+        {
+            FootballUpgradeDefinition tightFold = GetOrCreateUpgrade(
+                "tight_fold",
+                "Tight Fold",
+                "Cleaner creases reduce contact and direction uncertainty, with slightly calmer spin.",
+                UpgradeRarity.Common,
+                3,
+                1.2f,
+                new[]
+                {
+                    new FootballModifier("tight_fold.contact", FootballModifierType.ContactPointVariance, FootballModifierOperation.Multiply, 0.65f),
+                    new FootballModifier("tight_fold.direction", FootballModifierType.DirectionVariance, FootballModifierOperation.Multiply, 0.75f),
+                    new FootballModifier("tight_fold.spin", FootballModifierType.SpinTorque, FootballModifierOperation.Multiply, 0.9f)
+                },
+                new[] { "fold", "control" });
+
+            FootballUpgradeDefinition weightedCenter = GetOrCreateUpgrade(
+                "weighted_center",
+                "Weighted Center",
+                "Adds stability and straighter movement while reducing spin sensitivity.",
+                UpgradeRarity.Uncommon,
+                2,
+                0.8f,
+                new[]
+                {
+                    new FootballModifier("weighted.spin", FootballModifierType.SpinTorque, FootballModifierOperation.Multiply, 0.75f),
+                    new FootballModifier("weighted.direction", FootballModifierType.DirectionVariance, FootballModifierOperation.Multiply, 0.85f),
+                    new FootballModifier("weighted.angular", FootballModifierType.AngularDamping, FootballModifierOperation.Multiply, 1.1f),
+                    new FootballModifier("weighted.com_y", FootballModifierType.CenterOfMassY, FootballModifierOperation.Add, -0.01f)
+                },
+                new[] { "weight", "control" },
+                new[] { "loose_weight" });
+
+            FootballUpgradeDefinition looseFold = GetOrCreateUpgrade(
+                "loose_fold",
+                "Loose Fold",
+                "More dramatic spin potential at the cost of contact consistency.",
+                UpgradeRarity.Common,
+                3,
+                1f,
+                new[]
+                {
+                    new FootballModifier("loose.spin", FootballModifierType.SpinTorque, FootballModifierOperation.Multiply, 1.3f),
+                    new FootballModifier("loose.contact", FootballModifierType.ContactPointVariance, FootballModifierOperation.Multiply, 1.35f),
+                    new FootballModifier("loose.max_av", FootballModifierType.MaximumAngularVelocity, FootballModifierOperation.Multiply, 1.15f)
+                },
+                new[] { "fold", "loose_weight", "spin" },
+                new[] { "weight" });
+
+            FootballUpgradeDefinition waxedPaper = GetOrCreateUpgrade(
+                "waxed_paper",
+                "Waxed Paper",
+                "Slides farther on the desk, but adds a little force uncertainty.",
+                UpgradeRarity.Uncommon,
+                2,
+                0.8f,
+                new[]
+                {
+                    new FootballModifier("wax.friction", FootballModifierType.Friction, FootballModifierOperation.Multiply, 0.75f),
+                    new FootballModifier("wax.force", FootballModifierType.FlickForce, FootballModifierOperation.Multiply, 1.08f),
+                    new FootballModifier("wax.force_variance", FootballModifierType.ForceVariance, FootballModifierOperation.Multiply, 1.15f),
+                    new FootballModifier("wax.linear", FootballModifierType.LinearDamping, FootballModifierOperation.Multiply, 0.85f)
+                },
+                new[] { "surface", "travel" });
+
+            FootballUpgradeDefinition reinforcedTip = GetOrCreateUpgrade(
+                "reinforced_tip",
+                "Reinforced Tip",
+                "Field-goal flicks carry a little better and preview more clearly.",
+                UpgradeRarity.Rare,
+                2,
+                0.45f,
+                new[]
+                {
+                    new FootballModifier("tip.fg_force", FootballModifierType.FieldGoalForce, FootballModifierOperation.Multiply, 1.08f),
+                    new FootballModifier("tip.fg_direction", FootballModifierType.FieldGoalDirectionVariance, FootballModifierOperation.Multiply, 0.75f),
+                    new FootballModifier("tip.preview", FootballModifierType.PreviewAccuracy, FootballModifierOperation.Add, 0.15f)
+                },
+                new[] { "field_goal", "control" });
+
+            UpgradeCatalog catalog = GetOrCreateScriptableObject<UpgradeCatalog>(UpgradeCatalogPath);
+            catalog.Configure(new[] { tightFold, weightedCenter, looseFold, waxedPaper, reinforcedTip });
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static FootballUpgradeDefinition GetOrCreateUpgrade(
+            string id,
+            string displayName,
+            string description,
+            UpgradeRarity rarity,
+            int maxStacks,
+            float rewardWeight,
+            FootballModifier[] modifiers,
+            string[] tags,
+            string[] mutualExclusionTags = null)
+        {
+            string path = $"{RoguelikeFolder}/{id}.asset";
+            FootballUpgradeDefinition upgrade = GetOrCreateScriptableObject<FootballUpgradeDefinition>(path);
+            upgrade.Configure(id, displayName, description, rarity, maxStacks, rewardWeight, modifiers, tags, mutualExclusionTags);
+            EditorUtility.SetDirty(upgrade);
+            return upgrade;
+        }
+
+        private static OpponentCatalog GetOrCreateOpponentCatalog()
+        {
+            OpponentProfile power = GetOrCreateOpponent(
+                "power_flicker",
+                "Power Flicker",
+                0.86f,
+                0.16f,
+                0.25f,
+                OpponentContactPreference.SlightlyOffCenter,
+                0.55f,
+                0.82f,
+                0.78f,
+                0.45f,
+                0.2f,
+                0.5f);
+            OpponentProfile spinner = GetOrCreateOpponent(
+                "spinner",
+                "Spinner",
+                0.55f,
+                0.18f,
+                0.95f,
+                OpponentContactPreference.OffCenter,
+                0.58f,
+                0.65f,
+                0.55f,
+                0.55f,
+                0.55f,
+                0.55f);
+            OpponentProfile calculator = GetOrCreateOpponent(
+                "calculator",
+                "Calculator",
+                0.48f,
+                0.06f,
+                0.05f,
+                OpponentContactPreference.Center,
+                0.9f,
+                0.25f,
+                0.35f,
+                0.7f,
+                0.25f,
+                0.45f);
+
+            OpponentCatalog catalog = GetOrCreateScriptableObject<OpponentCatalog>(OpponentCatalogPath);
+            catalog.Configure(new[] { power, spinner, calculator });
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static OpponentProfile GetOrCreateOpponent(
+            string id,
+            string displayName,
+            float preferredPower,
+            float powerVariance,
+            float preferredSpin,
+            OpponentContactPreference contactPreference,
+            float accuracy,
+            float risk,
+            float edgePreference,
+            float fieldGoalSkill,
+            float obstaclePreference,
+            float delay)
+        {
+            string path = $"{RoguelikeFolder}/{id}.asset";
+            OpponentProfile profile = GetOrCreateScriptableObject<OpponentProfile>(path);
+            profile.Configure(id, displayName, preferredPower, powerVariance, preferredSpin, contactPreference, accuracy, risk, edgePreference, fieldGoalSkill, obstaclePreference, delay);
+            EditorUtility.SetDirty(profile);
+            return profile;
+        }
+
+        private static TableSurfaceCatalog GetOrCreateSurfaceCatalog()
+        {
+            TableSurfaceDefinition normal = GetOrCreateSurface("normal_desk", "Normal Desk", TableSurfaceKind.NormalDesk, 0.55f, 0.65f, 0.04f, 1f, new Color(0.42f, 0.26f, 0.13f));
+            TableSurfaceDefinition slippery = GetOrCreateSurface("slippery_desk", "Slippery Desk", TableSurfaceKind.SlipperyDesk, 0.25f, 0.32f, 0.035f, 0.85f, new Color(0.25f, 0.38f, 0.42f));
+            TableSurfaceDefinition rough = GetOrCreateSurface("rough_desk", "Rough Desk", TableSurfaceKind.RoughDesk, 0.95f, 1.05f, 0.02f, 1.2f, new Color(0.35f, 0.31f, 0.22f));
+            TableSurfaceDefinition science = GetOrCreateSurface("science_lab_table", "Science Lab Table", TableSurfaceKind.ScienceLabTable, 0.34f, 0.44f, 0.03f, 0.9f, new Color(0.32f, 0.43f, 0.46f));
+
+            TableSurfaceCatalog catalog = GetOrCreateScriptableObject<TableSurfaceCatalog>(SurfaceCatalogPath);
+            catalog.Configure(new[] { normal, slippery, rough, science });
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static TableSurfaceDefinition GetOrCreateSurface(string id, string displayName, TableSurfaceKind kind, float dynamicFriction, float staticFriction, float bounce, float damping, Color color)
+        {
+            string path = $"{RoguelikeFolder}/{id}.asset";
+            TableSurfaceDefinition surface = GetOrCreateScriptableObject<TableSurfaceDefinition>(path);
+            surface.Configure(id, displayName, kind, dynamicFriction, staticFriction, bounce, damping, color);
+            EditorUtility.SetDirty(surface);
+            return surface;
+        }
+
+        private static ObstacleLayoutCatalog GetOrCreateObstacleLayoutCatalog()
+        {
+            ObstacleLayoutDefinition none = GetOrCreateLayout("no_obstacles", "No Obstacles", ObstacleLayoutKind.None, new ObstacleSpawn[0]);
+            ObstacleLayoutDefinition pencil = GetOrCreateLayout("pencil_lane", "Pencil Lane", ObstacleLayoutKind.Pencil, new[]
+            {
+                new ObstacleSpawn { kind = ObstacleKind.Pencil, position = new Vector3(0f, TableTopY + 0.18f, 0.4f), scale = new Vector3(0.055f, 1.6f, 0.055f), eulerAngles = new Vector3(0f, 0f, 90f) }
+            });
+            ObstacleLayoutDefinition eraser = GetOrCreateLayout("eraser_midfield", "Eraser Midfield", ObstacleLayoutKind.Eraser, new[]
+            {
+                new ObstacleSpawn { kind = ObstacleKind.Eraser, position = new Vector3(0.95f, TableTopY + 0.18f, 0.1f), scale = new Vector3(0.55f, 0.18f, 0.36f), eulerAngles = Vector3.zero }
+            });
+            ObstacleLayoutDefinition book = GetOrCreateLayout("book_bank", "Book Bank", ObstacleLayoutKind.Book, new[]
+            {
+                new ObstacleSpawn { kind = ObstacleKind.Book, position = new Vector3(-1.1f, TableTopY + 0.13f, 1.25f), scale = new Vector3(1.15f, 0.12f, 0.8f), eulerAngles = new Vector3(0f, 18f, 0f) }
+            });
+            ObstacleLayoutDefinition mixed = GetOrCreateLayout("mixed_office", "Mixed Office", ObstacleLayoutKind.Mixed, new[]
+            {
+                new ObstacleSpawn { kind = ObstacleKind.Pencil, position = new Vector3(-0.75f, TableTopY + 0.18f, -0.55f), scale = new Vector3(0.055f, 1.35f, 0.055f), eulerAngles = new Vector3(0f, 0f, 70f) },
+                new ObstacleSpawn { kind = ObstacleKind.Eraser, position = new Vector3(1.05f, TableTopY + 0.18f, 0.85f), scale = new Vector3(0.48f, 0.18f, 0.34f), eulerAngles = new Vector3(0f, -18f, 0f) },
+                new ObstacleSpawn { kind = ObstacleKind.Book, position = new Vector3(-1.45f, TableTopY + 0.13f, 2.1f), scale = new Vector3(0.95f, 0.12f, 0.72f), eulerAngles = new Vector3(0f, 24f, 0f) }
+            });
+
+            ObstacleLayoutCatalog catalog = GetOrCreateScriptableObject<ObstacleLayoutCatalog>(ObstacleCatalogPath);
+            catalog.Configure(new[] { none, pencil, eraser, book, mixed });
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static ObstacleLayoutDefinition GetOrCreateLayout(string id, string displayName, ObstacleLayoutKind kind, ObstacleSpawn[] spawns)
+        {
+            string path = $"{RoguelikeFolder}/{id}.asset";
+            ObstacleLayoutDefinition layout = GetOrCreateScriptableObject<ObstacleLayoutDefinition>(path);
+            layout.Configure(id, displayName, kind, spawns);
+            EditorUtility.SetDirty(layout);
+            return layout;
+        }
+
+        private static T GetOrCreateScriptableObject<T>(string path) where T : ScriptableObject
+        {
+            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<T>();
+                AssetDatabase.CreateAsset(asset, path);
+            }
+
+            return asset;
         }
 
         private static PaperFootballConfig GetOrCreateConfig()
@@ -587,6 +946,234 @@ namespace PaperFootball.Editor
             return indicator;
         }
 
+        private static ShotUncertaintyPreview ConfigureShotUncertaintyPreview(
+            Transform parent,
+            Transform hudParent,
+            Material lineMaterial,
+            ContactPointSelector contactSelector,
+            ShotVarianceController shotVarianceController)
+        {
+            GameObject previewObject = GetOrCreateChild("ShotUncertaintyPreview", parent);
+
+            LineRenderer left = ConfigurePreviewLine("UncertaintyConeLeft", previewObject.transform, lineMaterial);
+            LineRenderer right = ConfigurePreviewLine("UncertaintyConeRight", previewObject.transform, lineMaterial);
+            LineRenderer jitter = ConfigurePreviewLine("ContactJitterRadius", previewObject.transform, lineMaterial);
+            jitter.loop = true;
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Text label = ConfigureText("UncertaintyPreviewText", hudParent, new Vector2(24f, -454f), font, 18, TextAnchor.UpperLeft);
+            label.rectTransform.sizeDelta = new Vector2(560f, 132f);
+            label.enabled = false;
+
+            ShotUncertaintyPreview preview = EnsureComponent<ShotUncertaintyPreview>(previewObject);
+            preview.Configure(left, right, jitter, label, contactSelector, shotVarianceController);
+            return preview;
+        }
+
+        private static LineRenderer ConfigurePreviewLine(string name, Transform parent, Material material)
+        {
+            GameObject lineObject = GetOrCreateChild(name, parent);
+            LineRenderer line = EnsureComponent<LineRenderer>(lineObject);
+            line.sharedMaterial = material;
+            line.useWorldSpace = true;
+            line.positionCount = 0;
+            line.startWidth = 0.018f;
+            line.endWidth = 0.008f;
+            line.enabled = false;
+            return line;
+        }
+
+        private static PrecisionTargetZone ConfigurePrecisionTargetZone(Transform parent, Material material)
+        {
+            GameObject zoneObject = GetOrCreateChild("PrecisionTargetZone", parent);
+            GameObject visual = GetOrCreatePrimitive("PrecisionTargetVisual", PrimitiveType.Cube, zoneObject.transform);
+            SetMaterial(visual, material);
+            if (visual.TryGetComponent(out Collider collider))
+            {
+                Object.DestroyImmediate(collider);
+            }
+
+            PrecisionTargetZone zone = EnsureComponent<PrecisionTargetZone>(zoneObject);
+            zone.Configure(visual.transform);
+            return zone;
+        }
+
+        private static RoguelikeDebugOverlay ConfigureRoguelikeDebugOverlay(
+            Transform hudParent,
+            RunController runController,
+            ShotVarianceController shotVarianceController,
+            OpponentTurnController opponentTurnController,
+            TableSurfaceApplier surfaceApplier,
+            ObstacleLayoutController obstacleLayoutController)
+        {
+            GameObject overlayObject = GetOrCreateUiChild("RoguelikeDebugOverlay", hudParent);
+            RectTransform overlayRect = EnsureComponent<RectTransform>(overlayObject);
+            overlayRect.anchorMin = new Vector2(1f, 0f);
+            overlayRect.anchorMax = new Vector2(1f, 0f);
+            overlayRect.pivot = new Vector2(1f, 0f);
+            overlayRect.anchoredPosition = new Vector2(-24f, 322f);
+            overlayRect.sizeDelta = new Vector2(620f, 280f);
+
+            GameObject textObject = GetOrCreateUiChild("RoguelikeDebugText", overlayObject.transform);
+            Text text = EnsureComponent<Text>(textObject);
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 15;
+            text.color = new Color(0.75f, 1f, 0.82f);
+            text.alignment = TextAnchor.LowerRight;
+            text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+
+            RectTransform textRect = EnsureComponent<RectTransform>(textObject);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.pivot = new Vector2(1f, 0f);
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            RoguelikeDebugOverlay overlay = EnsureComponent<RoguelikeDebugOverlay>(overlayObject);
+            overlay.Configure(runController, shotVarianceController, opponentTurnController, surfaceApplier, obstacleLayoutController, text, true);
+            return overlay;
+        }
+
+        private static RunProgressionUiController ConfigureRunUi(Transform parent)
+        {
+            GameObject canvasObject = GetOrCreateUiChild("RunCanvas", parent);
+            Canvas canvas = EnsureComponent<Canvas>(canvasObject);
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            CanvasScaler scaler = EnsureComponent<CanvasScaler>(canvasObject);
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            EnsureComponent<GraphicRaycaster>(canvasObject);
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            GameObject startPanel = ConfigurePanel("RunStartPanel", canvasObject.transform, new Vector2(0f, 0f), new Vector2(760f, 420f), new Color(0.05f, 0.07f, 0.08f, 0.92f));
+            Text startTitle = ConfigurePanelText("RunStartTitle", startPanel.transform, new Vector2(0f, -42f), "Roguelike Run", font, 38, TextAnchor.MiddleCenter, new Vector2(680f, 56f));
+            InputField seedInput = ConfigureInputField("SeedInput", startPanel.transform, new Vector2(0f, -120f), "12345", font);
+            Button randomSeed = ConfigureButton("RandomSeedButton", startPanel.transform, new Vector2(-190f, -205f), "Random Seed", font, new Color(0.22f, 0.34f, 0.42f));
+            Button startRun = ConfigureButton("StartRunButton", startPanel.transform, new Vector2(190f, -205f), "Start Run", font, new Color(0.1f, 0.55f, 0.38f));
+            Button returnLocal = ConfigureButton("ReturnLocalButton", startPanel.transform, new Vector2(0f, -305f), "Return To Local Match", font, new Color(0.24f, 0.28f, 0.32f));
+            startTitle.raycastTarget = false;
+
+            GameObject introPanel = ConfigurePanel("EncounterIntroPanel", canvasObject.transform, new Vector2(0f, 0f), new Vector2(840f, 500f), new Color(0.05f, 0.07f, 0.08f, 0.92f));
+            Text introText = ConfigurePanelText("EncounterIntroText", introPanel.transform, new Vector2(0f, -42f), string.Empty, font, 26, TextAnchor.UpperLeft, new Vector2(720f, 320f));
+            Button continueButton = ConfigureButton("ContinueEncounterButton", introPanel.transform, new Vector2(0f, -390f), "Continue", font, new Color(0.1f, 0.55f, 0.38f));
+
+            GameObject activePanel = ConfigurePanel("ActiveRunPanel", canvasObject.transform, new Vector2(0f, -12f), new Vector2(600f, 280f), new Color(0.04f, 0.055f, 0.06f, 0.72f));
+            RectTransform activeRect = EnsureComponent<RectTransform>(activePanel);
+            activeRect.anchorMin = new Vector2(1f, 1f);
+            activeRect.anchorMax = new Vector2(1f, 1f);
+            activeRect.pivot = new Vector2(1f, 1f);
+            activeRect.anchoredPosition = new Vector2(-24f, -24f);
+            Text activeText = ConfigurePanelText("ActiveRunText", activePanel.transform, new Vector2(0f, -18f), string.Empty, font, 18, TextAnchor.UpperLeft, new Vector2(536f, 236f));
+
+            GameObject rewardPanel = ConfigurePanel("RewardSelectionPanel", canvasObject.transform, new Vector2(0f, 0f), new Vector2(1100f, 520f), new Color(0.05f, 0.07f, 0.08f, 0.94f));
+            Text rewardHeader = ConfigurePanelText("RewardHeader", rewardPanel.transform, new Vector2(0f, -34f), "Choose one upgrade", font, 26, TextAnchor.MiddleCenter, new Vector2(980f, 72f));
+            Button[] rewardButtons = new Button[3];
+            Text[] rewardTexts = new Text[3];
+            for (int i = 0; i < 3; i++)
+            {
+                float x = -350f + i * 350f;
+                rewardButtons[i] = ConfigureButton($"RewardChoice{i + 1}", rewardPanel.transform, new Vector2(x, -260f), string.Empty, font, new Color(0.12f, 0.18f, 0.22f));
+                RectTransform buttonRect = EnsureComponent<RectTransform>(rewardButtons[i].gameObject);
+                buttonRect.sizeDelta = new Vector2(310f, 330f);
+                rewardTexts[i] = rewardButtons[i].GetComponentInChildren<Text>();
+                rewardTexts[i].alignment = TextAnchor.UpperLeft;
+                rewardTexts[i].fontSize = 19;
+            }
+
+            GameObject summaryPanel = ConfigurePanel("RunSummaryPanel", canvasObject.transform, new Vector2(0f, 0f), new Vector2(860f, 620f), new Color(0.05f, 0.07f, 0.08f, 0.94f));
+            Text summaryText = ConfigurePanelText("RunSummaryText", summaryPanel.transform, new Vector2(0f, -36f), string.Empty, font, 24, TextAnchor.UpperLeft, new Vector2(740f, 400f));
+            Button restartSame = ConfigureButton("RestartSameSeedButton", summaryPanel.transform, new Vector2(-250f, -500f), "Restart Seed", font, new Color(0.1f, 0.45f, 0.55f));
+            Button newSeed = ConfigureButton("NewSeedButton", summaryPanel.transform, new Vector2(0f, -500f), "New Seed", font, new Color(0.1f, 0.55f, 0.38f));
+            Button summaryLocal = ConfigureButton("SummaryLocalButton", summaryPanel.transform, new Vector2(250f, -500f), "Local Match", font, new Color(0.24f, 0.28f, 0.32f));
+
+            RunProgressionUiController ui = EnsureComponent<RunProgressionUiController>(canvasObject);
+            ui.Configure(
+                startPanel,
+                seedInput,
+                randomSeed,
+                startRun,
+                returnLocal,
+                introPanel,
+                introText,
+                continueButton,
+                activePanel,
+                activeText,
+                rewardPanel,
+                rewardHeader,
+                rewardButtons,
+                rewardTexts,
+                summaryPanel,
+                summaryText,
+                restartSame,
+                newSeed,
+                summaryLocal);
+            ui.HideRunPanels();
+            return ui;
+        }
+
+        private static GameObject ConfigurePanel(string name, Transform parent, Vector2 anchoredPosition, Vector2 size, Color color)
+        {
+            GameObject panel = GetOrCreateUiChild(name, parent);
+            RectTransform rect = EnsureComponent<RectTransform>(panel);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            Image image = EnsureComponent<Image>(panel);
+            image.color = color;
+            return panel;
+        }
+
+        private static Text ConfigurePanelText(string name, Transform parent, Vector2 anchoredPosition, string value, Font font, int fontSize, TextAnchor alignment, Vector2 size)
+        {
+            Text text = ConfigureText(name, parent, anchoredPosition, font, fontSize, alignment);
+            text.text = value;
+            text.rectTransform.anchorMin = new Vector2(0.5f, 1f);
+            text.rectTransform.anchorMax = new Vector2(0.5f, 1f);
+            text.rectTransform.pivot = new Vector2(0.5f, 1f);
+            text.rectTransform.sizeDelta = size;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            return text;
+        }
+
+        private static InputField ConfigureInputField(string name, Transform parent, Vector2 anchoredPosition, string value, Font font)
+        {
+            GameObject inputObject = GetOrCreateUiChild(name, parent);
+            RectTransform rect = EnsureComponent<RectTransform>(inputObject);
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(460f, 62f);
+            Image image = EnsureComponent<Image>(inputObject);
+            image.color = new Color(0.9f, 0.94f, 0.95f, 0.96f);
+
+            InputField input = EnsureComponent<InputField>(inputObject);
+            Text text = ConfigureText($"{name}Text", inputObject.transform, Vector2.zero, font, 26, TextAnchor.MiddleLeft);
+            text.color = Color.black;
+            text.rectTransform.anchorMin = Vector2.zero;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.offsetMin = new Vector2(18f, 0f);
+            text.rectTransform.offsetMax = new Vector2(-18f, 0f);
+            Text placeholder = ConfigureText($"{name}Placeholder", inputObject.transform, Vector2.zero, font, 24, TextAnchor.MiddleLeft);
+            placeholder.color = new Color(0f, 0f, 0f, 0.45f);
+            placeholder.text = "numeric seed";
+            placeholder.rectTransform.anchorMin = Vector2.zero;
+            placeholder.rectTransform.anchorMax = Vector2.one;
+            placeholder.rectTransform.offsetMin = new Vector2(18f, 0f);
+            placeholder.rectTransform.offsetMax = new Vector2(-18f, 0f);
+            input.textComponent = text;
+            input.placeholder = placeholder;
+            input.text = value;
+            input.contentType = InputField.ContentType.IntegerNumber;
+            return input;
+        }
+
         private static Text ConfigureText(string name, Transform parent, Vector2 anchoredPosition, Font font, int fontSize, TextAnchor alignment)
         {
             GameObject textObject = GetOrCreateUiChild(name, parent);
@@ -652,12 +1239,14 @@ namespace PaperFootball.Editor
             title.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             title.rectTransform.sizeDelta = new Vector2(900f, 80f);
 
-            Button startPrototype = ConfigureButton("StartPrototypeButton", canvasObject.transform, new Vector2(0f, -340f), "Start Tabletop Prototype", font, new Color(0.08f, 0.55f, 0.72f));
-            Button legacyMenu = ConfigureButton("LegacyMenuButton", canvasObject.transform, new Vector2(0f, -450f), "Open Existing Main Menu", font, new Color(0.24f, 0.28f, 0.32f));
-            Button legacyTable = ConfigureButton("LegacyTableButton", canvasObject.transform, new Vector2(0f, -550f), "Open Existing Table Scene", font, new Color(0.24f, 0.28f, 0.32f));
+            Button startPrototype = ConfigureButton("StartPrototypeButton", canvasObject.transform, new Vector2(0f, -310f), "Local Match", font, new Color(0.08f, 0.55f, 0.72f));
+            Button startRun = ConfigureButton("StartRunButton", canvasObject.transform, new Vector2(0f, -405f), "Roguelike Run", font, new Color(0.1f, 0.55f, 0.38f));
+            Button quit = ConfigureButton("QuitButton", canvasObject.transform, new Vector2(0f, -500f), "Quit", font, new Color(0.36f, 0.22f, 0.24f));
+            Button legacyMenu = ConfigureButton("LegacyMenuButton", canvasObject.transform, new Vector2(-240f, -610f), "Existing Menu", font, new Color(0.24f, 0.28f, 0.32f));
+            Button legacyTable = ConfigureButton("LegacyTableButton", canvasObject.transform, new Vector2(240f, -610f), "Existing Table", font, new Color(0.24f, 0.28f, 0.32f));
 
             PrototypeMenuController controller = EnsureComponent<PrototypeMenuController>(canvasObject);
-            controller.Configure(startPrototype, legacyMenu, legacyTable, "PaperFootballGame", "MainMenu", "TableScene");
+            controller.Configure(startPrototype, startRun, quit, legacyMenu, legacyTable, "PaperFootballGame", "MainMenu", "TableScene");
 
             MarkDirty(root, canvasObject);
 
@@ -814,12 +1403,24 @@ namespace PaperFootball.Editor
 
         private static T EnsureComponent<T>(GameObject target) where T : Component
         {
+            RemoveMissingMonoBehaviours(target);
+
             if (target.TryGetComponent(out T component))
             {
                 return component;
             }
 
             return target.AddComponent<T>();
+        }
+
+        private static void RemoveMissingMonoBehaviours(GameObject target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            GameObjectUtility.RemoveMonoBehavioursWithMissingScript(target);
         }
 
         private static void RemoveComponent<T>(GameObject target) where T : Component

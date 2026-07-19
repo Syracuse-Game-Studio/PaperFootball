@@ -39,13 +39,7 @@ namespace PaperFootball.Tabletop.Input
                 return false;
             }
 
-            if (!UnityEngine.Physics.Raycast(ray, out RaycastHit hit, raycastDistance))
-            {
-                contactPoint = default;
-                return false;
-            }
-
-            if (!IsFootballCollider(hit.collider))
+            if (!FootballContactRaycaster.TryRaycast(footballCollider, ray, raycastDistance, out RaycastHit hit))
             {
                 contactPoint = default;
                 return false;
@@ -84,20 +78,6 @@ namespace PaperFootball.Tabletop.Input
             {
                 ClearSelection();
             }
-        }
-
-        private bool IsFootballCollider(Collider candidate)
-        {
-            if (candidate == null || footballCollider == null)
-            {
-                return false;
-            }
-
-            Transform footballTransform = footballCollider.transform;
-            Transform candidateTransform = candidate.transform;
-            return candidate == footballCollider ||
-                   candidateTransform == footballTransform ||
-                   candidateTransform.IsChildOf(footballTransform);
         }
 
         private static bool IsPointerOverUi()

@@ -141,12 +141,7 @@ namespace PaperFootball.Tabletop.Input
         private void TryStartDrag(Vector2 screenPosition)
         {
             Ray ray = gameplayCamera.ScreenPointToRay(screenPosition);
-            if (!UnityEngine.Physics.Raycast(ray, out RaycastHit hit, 200f))
-            {
-                return;
-            }
-
-            if (hit.collider != footballCollider)
+            if (!FootballContactRaycaster.TryRaycast(footballCollider, ray, 200f, out RaycastHit hit))
             {
                 return;
             }

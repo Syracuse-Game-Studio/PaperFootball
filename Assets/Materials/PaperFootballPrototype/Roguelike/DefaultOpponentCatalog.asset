@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: DefaultOpponentCatalog
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Opponents:OpponentCatalog
+  opponents:
+  - {fileID: 11400000, guid: 38d162f2ebf3b214e8ed20f2eaf2f7ce, type: 2}
+  - {fileID: 11400000, guid: 6a37c1acb0cc4804eb1b20f5b89b74d2, type: 2}
+  - {fileID: 11400000, guid: cb1559522d59e544ba71eb77b6e498b1, type: 2}

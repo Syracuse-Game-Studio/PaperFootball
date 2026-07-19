@@ -1,3 +1,4 @@
+using PaperFootball.Tabletop.Roguelike.Presentation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -7,6 +8,8 @@ namespace PaperFootball.Tabletop.Presentation
     public class PrototypeMenuController : MonoBehaviour
     {
         [SerializeField] private Button startPrototypeButton;
+        [SerializeField] private Button startRunButton;
+        [SerializeField] private Button quitButton;
         [SerializeField] private Button legacyMenuButton;
         [SerializeField] private Button legacyTableButton;
         [SerializeField] private string prototypeSceneName = "PaperFootballGame";
@@ -15,6 +18,8 @@ namespace PaperFootball.Tabletop.Presentation
 
         public void Configure(
             Button prototypeButton,
+            Button roguelikeButton,
+            Button quitGameButton,
             Button menuButton,
             Button tableButton,
             string prototypeScene,
@@ -22,6 +27,8 @@ namespace PaperFootball.Tabletop.Presentation
             string tableScene)
         {
             startPrototypeButton = prototypeButton;
+            startRunButton = roguelikeButton;
+            quitButton = quitGameButton;
             legacyMenuButton = menuButton;
             legacyTableButton = tableButton;
             prototypeSceneName = prototypeScene;
@@ -47,6 +54,18 @@ namespace PaperFootball.Tabletop.Presentation
                 startPrototypeButton.onClick.AddListener(LoadPrototype);
             }
 
+            if (startRunButton != null)
+            {
+                startRunButton.onClick.RemoveListener(LoadRoguelikeRun);
+                startRunButton.onClick.AddListener(LoadRoguelikeRun);
+            }
+
+            if (quitButton != null)
+            {
+                quitButton.onClick.RemoveListener(QuitGame);
+                quitButton.onClick.AddListener(QuitGame);
+            }
+
             if (legacyMenuButton != null)
             {
                 legacyMenuButton.onClick.RemoveListener(LoadLegacyMenu);
@@ -62,6 +81,13 @@ namespace PaperFootball.Tabletop.Presentation
 
         private void LoadPrototype()
         {
+            PrototypeLaunchOptions.RequestLocalMatch();
+            SceneManager.LoadScene(prototypeSceneName);
+        }
+
+        private void LoadRoguelikeRun()
+        {
+            PrototypeLaunchOptions.RequestRoguelikeRun();
             SceneManager.LoadScene(prototypeSceneName);
         }
 
@@ -73,6 +99,11 @@ namespace PaperFootball.Tabletop.Presentation
         private void LoadLegacyTable()
         {
             SceneManager.LoadScene(legacyTableSceneName);
+        }
+
+        private void QuitGame()
+        {
+            Application.Quit();
         }
     }
 }

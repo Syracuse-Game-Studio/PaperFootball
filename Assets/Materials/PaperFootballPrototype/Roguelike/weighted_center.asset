@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: weighted_center
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Modifiers:FootballUpgradeDefinition
+  stableId: weighted_center
+  displayName: Weighted Center
+  description: Adds stability and straighter movement while reducing spin sensitivity.
+  rarity: 1
+  icon: {fileID: 0}
+  maximumStackCount: 2
+  modifiers:
+  - stableId: weighted.spin
+    modifierType: 5
+    operation: 1
+    value: 0.75
+    priority: 0
+  - stableId: weighted.direction
+    modifierType: 3
+    operation: 1
+    value: 0.85
+    priority: 0
+  - stableId: weighted.angular
+    modifierType: 7
+    operation: 1
+    value: 1.1
+    priority: 0
+  - stableId: weighted.com_y
+    modifierType: 11
+    operation: 0
+    value: -0.01
+    priority: 0
+  tags:
+  - weight
+  - control
+  mutualExclusionTags:
+  - loose_weight
+  rewardWeight: 0.8

@@ -2,6 +2,8 @@
 
 > Consolidated note: use `Assets/Docs/PaperFootballConsolidatedHandoffReport.md` as the current single intake report. This file is retained for historical detail.
 
+> Phase 2 note: `Assets/Docs/RoguelikePhase2HandoffReport.md` documents the roguelike run foundation added after this original implementation report.
+
 Date prepared: 2026-07-17
 
 ## Purpose

@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: reinforced_tip
+  m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Modifiers:FootballUpgradeDefinition
+  stableId: reinforced_tip
+  displayName: Reinforced Tip
+  description: Field-goal flicks carry a little better and preview more clearly.
+  rarity: 2
+  icon: {fileID: 0}
+  maximumStackCount: 2
+  modifiers:
+  - stableId: tip.fg_force
+    modifierType: 14
+    operation: 1
+    value: 1.08
+    priority: 0
+  - stableId: tip.fg_direction
+    modifierType: 15
+    operation: 1
+    value: 0.75
+    priority: 0
+  - stableId: tip.preview
+    modifierType: 19
+    operation: 0
+    value: 0.15
+    priority: 0
+  tags:
+  - field_goal
+  - control
+  mutualExclusionTags: []
+  rewardWeight: 0.45
