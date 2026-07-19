@@ -21,12 +21,16 @@ MonoBehaviour:
     requiredOverhangPercent: 0
     minimumSupportedPercent: 0.25
     fallingFromTableChangesPossession: 1
-    maximumFlickForce: 18
-    minimumFlickForce: 1.5
+    maximumFlickForce: 4
+    minimumFlickForce: 0.35
+    flickForceResponseExponent: 1.6
     minimumDragDistance: 0.05
     maximumDragDistance: 2.5
     footballStoppingThreshold: 0.08
     angularStoppingThreshold: 0.25
+    footballAngularDamping: 0.8
+    contactYawTorqueMultiplier: 2.5
+    maximumFootballAngularVelocity: 24
     requiredStillTime: 0.35
     fallHeight: -1.2
     fieldGoalTimeLimit: 6

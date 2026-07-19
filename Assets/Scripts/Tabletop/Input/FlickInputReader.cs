@@ -15,12 +15,17 @@ namespace PaperFootball.Tabletop.Input
         private PaperFootballRuleSet rules = new();
         private bool isDragging;
         private Vector3 dragStartWorld;
+        private Vector3 dragContactWorld;
+        private Vector3 contactPointOverrideWorld;
         private Vector3 currentWorld;
         private float dragStartTime;
+        private bool hasContactPointOverride;
 
         public bool InputEnabled { get; set; } = true;
         public bool IsDragging => isDragging;
         public FlickCommand CurrentPreview { get; private set; }
+        public bool HasContactPointOverride => hasContactPointOverride;
+        public Vector3 ContactPointOverrideWorld => contactPointOverrideWorld;
 
         public event Action<FlickCommand> DragChanged;
         public event Action<FlickCommand> FlickReleased;
@@ -43,6 +48,18 @@ namespace PaperFootball.Tabletop.Input
             rules.Sanitize();
         }
 
+        public void SetContactPointOverride(Vector3 worldPoint)
+        {
+            contactPointOverrideWorld = worldPoint;
+            hasContactPointOverride = true;
+        }
+
+        public void ClearContactPointOverride()
+        {
+            hasContactPointOverride = false;
+            contactPointOverrideWorld = Vector3.zero;
+        }
+
         public void CancelDrag()
         {
             if (!isDragging)
@@ -51,7 +68,7 @@ namespace PaperFootball.Tabletop.Input
             }
 
             isDragging = false;
-            CurrentPreview = FlickCommand.Invalid(dragStartWorld, currentWorld, Time.time - dragStartTime);
+            CurrentPreview = FlickCommand.Invalid(dragStartWorld, currentWorld, Time.time - dragStartTime, dragContactWorld);
             DragChanged?.Invoke(CurrentPreview);
         }
 
@@ -141,8 +158,9 @@ namespace PaperFootball.Tabletop.Input
 
             isDragging = true;
             dragStartTime = Time.time;
+            dragContactWorld = hasContactPointOverride ? contactPointOverrideWorld : hit.point;
             currentWorld = dragStartWorld;
-            CurrentPreview = FlickCommand.Invalid(dragStartWorld, currentWorld, 0f);
+            CurrentPreview = FlickCommand.Invalid(dragStartWorld, currentWorld, 0f, dragContactWorld);
             DragChanged?.Invoke(CurrentPreview);
         }
 
@@ -153,7 +171,7 @@ namespace PaperFootball.Tabletop.Input
                 return;
             }
 
-            CurrentPreview = FlickForceCalculator.Calculate(dragStartWorld, currentWorld, Time.time - dragStartTime, rules);
+            CurrentPreview = FlickForceCalculator.Calculate(dragStartWorld, currentWorld, Time.time - dragStartTime, rules, dragContactWorld);
             DragChanged?.Invoke(CurrentPreview);
         }
 
@@ -161,12 +179,12 @@ namespace PaperFootball.Tabletop.Input
         {
             if (TryScreenToDragPlane(screenPosition, out currentWorld))
             {
-                CurrentPreview = FlickForceCalculator.Calculate(dragStartWorld, currentWorld, Time.time - dragStartTime, rules);
+                CurrentPreview = FlickForceCalculator.Calculate(dragStartWorld, currentWorld, Time.time - dragStartTime, rules, dragContactWorld);
             }
 
             isDragging = false;
             FlickReleased?.Invoke(CurrentPreview);
-            DragChanged?.Invoke(FlickCommand.Invalid(dragStartWorld, currentWorld, Time.time - dragStartTime));
+            DragChanged?.Invoke(FlickCommand.Invalid(dragStartWorld, currentWorld, Time.time - dragStartTime, dragContactWorld));
         }
 
         private bool TryScreenToDragPlane(Vector2 screenPosition, out Vector3 worldPosition)

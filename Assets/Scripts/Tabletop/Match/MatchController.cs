@@ -18,6 +18,7 @@ namespace PaperFootball.Tabletop.Match
         [SerializeField] private FootballPhysicsController footballPhysics;
         [SerializeField] private FootballRestDetector restDetector;
         [SerializeField] private FlickInputReader inputReader;
+        [SerializeField] private FlickInteractionController flickInteraction;
         [SerializeField] private TableBoundaryDetector tableBoundary;
         [SerializeField] private GameHudController hud;
         [SerializeField] private FlickAimIndicator aimIndicator;
@@ -53,12 +54,14 @@ namespace PaperFootball.Tabletop.Match
             FieldGoalController goalController,
             Collider football,
             Transform p1Start,
-            Transform p2Start)
+            Transform p2Start,
+            FlickInteractionController interactionController = null)
         {
             config = rulesConfig;
             footballPhysics = physicsController;
             restDetector = detector;
             inputReader = reader;
+            flickInteraction = interactionController;
             tableBoundary = boundaryDetector;
             hud = hudController;
             aimIndicator = indicator;
@@ -132,7 +135,15 @@ namespace PaperFootball.Tabletop.Match
                 match.StateChanged += Render;
             }
 
-            if (inputReader != null)
+            if (flickInteraction != null)
+            {
+                flickInteraction.DragChanged += OnDragChanged;
+                flickInteraction.FlickReleased += OnFlickReleased;
+                flickInteraction.ResetBallRequested += OnResetBallRequested;
+                flickInteraction.NewMatchRequested += OnNewMatchRequested;
+                flickInteraction.CancelRequested += OnCancelRequested;
+            }
+            else if (inputReader != null)
             {
                 inputReader.DragChanged += OnDragChanged;
                 inputReader.FlickReleased += OnFlickReleased;
@@ -159,7 +170,15 @@ namespace PaperFootball.Tabletop.Match
                 match.StateChanged -= Render;
             }
 
-            if (inputReader != null)
+            if (flickInteraction != null)
+            {
+                flickInteraction.DragChanged -= OnDragChanged;
+                flickInteraction.FlickReleased -= OnFlickReleased;
+                flickInteraction.ResetBallRequested -= OnResetBallRequested;
+                flickInteraction.NewMatchRequested -= OnNewMatchRequested;
+                flickInteraction.CancelRequested -= OnCancelRequested;
+            }
+            else if (inputReader != null)
             {
                 inputReader.DragChanged -= OnDragChanged;
                 inputReader.FlickReleased -= OnFlickReleased;
@@ -184,6 +203,7 @@ namespace PaperFootball.Tabletop.Match
             footballPhysics?.Configure(rules);
             restDetector?.Configure(rules);
             inputReader?.SetRules(rules);
+            flickInteraction?.ApplyMatchState(match);
             overhangDebugOverlay?.Configure(this, null);
             trajectoryPreview?.Configure(footballPhysics != null ? footballPhysics.Rigidbody : null, rules);
         }
@@ -418,8 +438,9 @@ namespace PaperFootball.Tabletop.Match
 
             Transform start = match.CurrentPlayer == PaperFootballPlayer.PlayerOne ? playerOneStart : playerTwoStart;
             Vector3 position = start != null ? start.position : Vector3.zero;
-            Quaternion rotation = start != null ? start.rotation : Quaternion.Euler(90f, 0f, 0f);
+            Quaternion rotation = start != null ? start.rotation : Quaternion.identity;
             footballPhysics.PlaceAt(position, rotation);
+            flickInteraction?.ClearSelection();
             restDetector?.ResetDetector();
             fellResolved = false;
         }
@@ -437,6 +458,7 @@ namespace PaperFootball.Tabletop.Match
             Vector3 position = start != null ? start.position : Vector3.zero;
             Quaternion rotation = start != null ? start.rotation : Quaternion.identity;
             footballPhysics.PlaceAt(position, rotation);
+            flickInteraction?.ClearSelection();
             restDetector?.ResetDetector();
             fieldGoalController?.EndAttempt();
             fellResolved = false;
@@ -444,7 +466,11 @@ namespace PaperFootball.Tabletop.Match
 
         private void Render()
         {
-            if (inputReader != null && match != null)
+            if (flickInteraction != null && match != null)
+            {
+                flickInteraction.ApplyMatchState(match);
+            }
+            else if (inputReader != null && match != null)
             {
                 inputReader.InputEnabled = match.Phase == MatchPhase.WaitingForFlick ||
                                            match.Phase == MatchPhase.FieldGoalSetup;

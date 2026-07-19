@@ -87,7 +87,7 @@ namespace PaperFootball.Tabletop.PlayModeTests
 
         private static void PlaceFootballAtPositiveOverhang(SceneRefs refs, float overhangDistance)
         {
-            Quaternion rotation = Quaternion.Euler(90f, 0f, 0f);
+            Quaternion rotation = Quaternion.identity;
             refs.Physics.PlaceAt(new Vector3(0f, refs.Table.TableTopY + 0.2f, 0f), rotation);
             UnityEngine.Physics.SyncTransforms();
 

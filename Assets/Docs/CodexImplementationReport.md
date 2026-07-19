@@ -19,9 +19,13 @@ Build settings place the launcher first, then the prototype scene, then the olde
 ## Gameplay Implemented
 
 - Tabletop playing surface with floor, scoring edges, goalposts, and placeholder materials.
-- Triangular paper football mesh with collider, Rigidbody, damping, friction material, and simple spin.
+- Triangular paper football mesh with collider, Rigidbody, damping, friction material, and contact-point spin from off-center flicks.
+- Root-aligned football Rigidbody with a flat rotated `PaperFootballVisual` child, so world/table Y rotation is the free spin axis.
+- Visible football orientation references: a dark fold line and asymmetric corner mark parented to the Rigidbody football.
+- Spin debug overlay for linear velocity, angular velocity, yaw angular velocity, Y rotation, contact point, center of mass, lever-arm distance, and angular damping.
 - Mouse drag/release flick input.
-- Flick strength calculation with minimum force, maximum force, minimum drag distance, and maximum drag distance.
+- Two-stage contact-then-flick interaction foundation for the roguelike track.
+- Flick strength calculation with minimum force, maximum force, minimum drag distance, maximum drag distance, and a softened force response curve.
 - Turn management between Player One and Player Two.
 - Possession counter.
 - Out-of-bounds/fall detection.
@@ -35,7 +39,8 @@ Build settings place the launcher first, then the prototype scene, then the olde
 
 ## Current Controls
 
-- Left mouse button on the football: start a flick.
+- Left mouse button on the football: select the flick contact point.
+- After contact selection, drag/release with the left mouse button to aim and apply force.
 - Drag away from the intended travel direction: slingshot-style aim.
 - Release left mouse: apply flick.
 - Longer drag: stronger flick, up to configured maximum.
@@ -114,8 +119,13 @@ Rules are kept independent from scene objects.
 - `FlickInputReader`
 - `FlickCommand`
 - `FlickForceCalculator`
+- `FlickInteractionController`
+- `FlickInteractionStateMachine`
+- `ContactPointSelector`
+- `SelectedContactPoint`
 
 The input layer tracks drag start, current drag point, duration, force, direction, and validity.
+The roguelike flick foundation adds a contact-selection stage that stores the selected football hit point in local space before enabling drag direction and power input.
 
 ### Physics
 
@@ -144,6 +154,9 @@ The field-goal flow prevents duplicate scores and reports results back to the ma
 
 - `GameHudController`
 - `FlickAimIndicator`
+- `ContactPointIndicator`
+- `FootballCameraController`
+- `FootballSpinDebugOverlay`
 - `PrototypeMenuController`
 
 UI observes match/input state and does not own scoring rules.
@@ -223,24 +236,32 @@ Play Mode tests:
 Coverage includes:
 
 - flick applies velocity
+- centered flicks produce less yaw than off-center flicks
+- left/right contact points create opposite yaw directions
+- off-center flicks visibly change transform Y rotation and keep rotating past the first physics step
+- root-aligned tabletop footballs visibly yaw from off-center flicks
+- yaw slows because of angular damping
+- rest detection waits for angular velocity to drop below threshold
+- generated visible spin references are parented to the Rigidbody football
 - rest detector reports rest
 - generated scene has required prototype references
 - kickoff football is inside camera view
 
 ## Latest Validation Results
 
-The last validation runs completed successfully:
+The latest validation runs completed successfully after the visible-spin readability update:
 
-- Unity batch mode: completed successfully.
-- Edit Mode tests: 18 passed, 0 failed.
-- Play Mode tests: 4 passed, 0 failed.
+- Unity batch compile: exit code `0`; log reported `Tundra build success` and `Batchmode quit successfully`.
+- Scene scaffolder: exit code `0`; rebuilt `Assets/Scenes/PaperFootballGame.unity` and `Assets/Scenes/PaperFootballLauncher.unity`.
+- Edit Mode tests: 40 passed, 0 failed.
+- Play Mode tests: 21 passed, 0 failed.
+- `git diff --check`: no whitespace errors; line-ending normalization warnings only.
 
-Recent known compile warnings from older existing scripts were previously observed:
+No C# compiler errors or C# compiler warnings were found in the targeted compile log scan.
 
-- `Assets/Scripts/Ball/PaperFootballPhysics.cs`: unused `dragForce`.
-- `Assets/Scripts/Input/InputManager.cs`: unused `enableKeyboardInput`.
+Log note: Unity emitted `[Licensing::Module] Error: Access token is unavailable; failed to update` during batch runs. This did not block compilation, scaffolding, or tests.
 
-No new compiler errors were reported in the validation runs.
+Process note: the Play Mode run saved a passing Unity `TestResults.xml` but did not exit before the shell timeout, so the leftover hidden Unity batch process was stopped after the results were verified.
 
 ## Current Default Rule Values
 
@@ -253,21 +274,28 @@ From `Assets/Materials/PaperFootballPrototype/DefaultPaperFootballConfig.asset`:
 - Required overhang percent: `0`
 - Minimum supported percent: `0.25`
 - Falling from table changes possession: `true`
-- Maximum flick force: `18`
-- Minimum flick force: `1.5`
+- Maximum flick force: `4`
+- Minimum flick force: `0.35`
+- Flick force response exponent: `1.6`
 - Maximum drag distance: `2.5`
 - Football stopping threshold: `0.08`
+- Angular stopping threshold: `0.25`
+- Football angular damping: `0.8`
+- Contact yaw torque multiplier: `2.5`
+- Maximum football angular velocity: `24`
 - Fall height: `-1.2`
 - Kickoff offset from center: `3.8`
 
 ## Known Limitations
 
 - Visuals are placeholder geometry and materials.
+- The fold line and corner mark are functional readability placeholders, not final paper art.
 - Field-goal aiming uses the same drag input plus a fixed upward impulse, not a dedicated kicking UI.
 - Goal-mouth detection is a simple trigger between uprights/above crossbar, not a full flight-path review.
 - Touchdown detection uses collider bounds, not an exact triangle mesh footprint.
+- Contact selection uses the football collider, which is currently a box collider around the triangular mesh.
 - Scene validation checks required references and camera framing, not a full end-to-end gameplay simulation.
-- No dedicated camera controls or replay/debug overlay yet.
+- No dedicated camera controls or replay system yet.
 - No AI or online/multiplayer flow; this is a local two-player prototype.
 
 ## Suggested Next Steps

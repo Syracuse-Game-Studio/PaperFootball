@@ -43,9 +43,12 @@ namespace PaperFootball.Editor
             Material tableMaterial = GetOrCreateMaterial("Table.mat", new Color(0.42f, 0.26f, 0.13f));
             Material floorMaterial = GetOrCreateMaterial("Floor.mat", new Color(0.12f, 0.13f, 0.15f));
             Material footballMaterial = GetOrCreateMaterial("PaperFootball.mat", new Color(0.96f, 0.95f, 0.86f));
+            Material footballFoldLineMaterial = GetOrCreateMaterial("FootballFoldLine.mat", new Color(0.12f, 0.09f, 0.065f));
+            Material footballCornerMarkMaterial = GetOrCreateMaterial("FootballCornerMark.mat", new Color(0.72f, 0.14f, 0.09f));
             Material edgeOneMaterial = GetOrCreateMaterial("PlayerOneEdge.mat", new Color(0.1f, 0.7f, 0.95f, 0.85f));
             Material edgeTwoMaterial = GetOrCreateMaterial("PlayerTwoEdge.mat", new Color(1f, 0.35f, 0.24f, 0.85f));
             Material indicatorMaterial = GetOrCreateMaterial("AimIndicator.mat", new Color(0.1f, 0.95f, 0.75f));
+            Material contactMarkerMaterial = GetOrCreateMaterial("ContactMarker.mat", new Color(1f, 0.82f, 0.12f));
             PhysicsMaterial footballPhysicsMaterial = GetOrCreatePhysicsMaterial();
 
             GameObject root = GetOrCreateRoot("PaperFootballPrototype");
@@ -67,37 +70,57 @@ namespace PaperFootball.Editor
             ConfigureScoringEdge(playerTwoEdge, new Vector3(0f, TableTopY + 0.025f, -TableScale.z * 0.5f), edgeTwoMaterial);
 
             GameObject playerOneStart = GetOrCreateChild("PlayerOneStart", root.transform);
-            playerOneStart.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, -config.Rules.kickoffOffsetFromCenter), Quaternion.Euler(90f, 0f, 0f));
+            playerOneStart.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, -config.Rules.kickoffOffsetFromCenter), Quaternion.identity);
 
             GameObject playerTwoStart = GetOrCreateChild("PlayerTwoStart", root.transform);
-            playerTwoStart.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, config.Rules.kickoffOffsetFromCenter), Quaternion.Euler(90f, 180f, 0f));
+            playerTwoStart.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, config.Rules.kickoffOffsetFromCenter), Quaternion.Euler(0f, 180f, 0f));
 
             GameObject playerOneFieldGoalSpot = GetOrCreateChild("PlayerOneFieldGoalSpot", root.transform);
-            playerOneFieldGoalSpot.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, 2.2f), Quaternion.Euler(90f, 0f, 0f));
+            playerOneFieldGoalSpot.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, 2.2f), Quaternion.identity);
 
             GameObject playerTwoFieldGoalSpot = GetOrCreateChild("PlayerTwoFieldGoalSpot", root.transform);
-            playerTwoFieldGoalSpot.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, -2.2f), Quaternion.Euler(90f, 180f, 0f));
+            playerTwoFieldGoalSpot.transform.SetPositionAndRotation(new Vector3(0f, FootballCenterY, -2.2f), Quaternion.Euler(0f, 180f, 0f));
 
             GameObject football = GetOrCreateChild("Paper Football", root.transform);
             football.transform.SetPositionAndRotation(playerOneStart.transform.position, playerOneStart.transform.rotation);
             football.transform.localScale = Vector3.one;
-            EnsureComponent<MeshFilter>(football);
-            MeshRenderer footballRenderer = EnsureComponent<MeshRenderer>(football);
+            RemoveComponent<PaperFootballMesh>(football);
+            RemoveComponent<MeshFilter>(football);
+            RemoveComponent<MeshRenderer>(football);
+            GameObject footballVisual = GetOrCreateChild("PaperFootballVisual", football.transform);
+            footballVisual.transform.localPosition = Vector3.zero;
+            footballVisual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            footballVisual.transform.localScale = Vector3.one;
+            EnsureComponent<MeshFilter>(footballVisual);
+            MeshRenderer footballRenderer = EnsureComponent<MeshRenderer>(footballVisual);
             footballRenderer.sharedMaterial = footballMaterial;
-            EnsureComponent<PaperFootballMesh>(football);
+            EnsureComponent<PaperFootballMesh>(footballVisual);
             BoxCollider footballCollider = EnsureComponent<BoxCollider>(football);
-            footballCollider.size = new Vector3(0.46f, 0.62f, 0.16f);
+            footballCollider.size = new Vector3(0.46f, 0.16f, 0.62f);
             footballCollider.center = Vector3.zero;
             footballCollider.material = footballPhysicsMaterial;
             Rigidbody footballBody = EnsureComponent<Rigidbody>(football);
             footballBody.mass = 0.16f;
             footballBody.useGravity = true;
             footballBody.linearDamping = 1.15f;
-            footballBody.angularDamping = 1.8f;
+            footballBody.angularDamping = config.Rules.footballAngularDamping;
+            footballBody.maxAngularVelocity = config.Rules.maximumFootballAngularVelocity;
             footballBody.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             FootballPhysicsController physicsController = EnsureComponent<FootballPhysicsController>(football);
             FootballRestDetector restDetector = EnsureComponent<FootballRestDetector>(football);
             restDetector.Configure(config.Rules);
+            GameObject footballFoldLine = ConfigureFootballSpinReferencePart(
+                football.transform,
+                "FootballFoldLine",
+                new Vector3(0f, 0.083f, 0.02f),
+                new Vector3(0.032f, 0.01f, 0.48f),
+                footballFoldLineMaterial);
+            GameObject footballCornerMark = ConfigureFootballSpinReferencePart(
+                football.transform,
+                "FootballCornerMark",
+                new Vector3(-0.12f, 0.086f, -0.22f),
+                new Vector3(0.12f, 0.012f, 0.05f),
+                footballCornerMarkMaterial);
 
             GameObject goalposts = GetOrCreateChild("Goalposts", root.transform);
             ConfigureGoalpost("PlayerOneGoalpost", goalposts.transform, TableScale.z * 0.5f + 0.35f, edgeOneMaterial);
@@ -106,12 +129,26 @@ namespace PaperFootball.Editor
             GoalPostTrigger playerTwoGoalTrigger = ConfigureGoalTrigger("PlayerTwoGoalTrigger", goalposts.transform, -TableScale.z * 0.5f - 0.35f, PaperFootballPlayer.PlayerTwo);
 
             Camera camera = ConfigureCamera(root.transform);
+            FootballCameraController cameraController = EnsureComponent<FootballCameraController>(camera.gameObject);
+            cameraController.Configure(
+                camera,
+                football.transform,
+                new Vector3(0f, 9.4f, -7.4f),
+                new Vector3(0f, TableTopY, 0f),
+                6.8f,
+                new Vector3(0f, 2.15f, -1.85f),
+                0.95f,
+                0.35f);
             ConfigureLighting(root.transform);
             ConfigureEventSystem(root.transform);
 
             GameObject inputObject = GetOrCreateChild("FlickInputReader", root.transform);
             FlickInputReader inputReader = EnsureComponent<FlickInputReader>(inputObject);
             inputReader.Configure(camera, footballCollider, config.Rules, TableTopY + 0.05f);
+
+            GameObject contactSelectorObject = GetOrCreateChild("ContactPointSelector", root.transform);
+            ContactPointSelector contactSelector = EnsureComponent<ContactPointSelector>(contactSelectorObject);
+            contactSelector.Configure(camera, footballCollider);
 
             GameObject boundaryObject = GetOrCreateChild("TableBoundaryDetector", root.transform);
             TableBoundaryDetector boundaryDetector = EnsureComponent<TableBoundaryDetector>(boundaryObject);
@@ -132,6 +169,8 @@ namespace PaperFootball.Editor
 
             GameHudController hud = ConfigureHud(root.transform);
             OverhangDebugOverlay overhangDebugOverlay = ConfigureOverhangDebugOverlay(hud.transform);
+            FootballSpinDebugOverlay spinDebugOverlay = ConfigureSpinDebugOverlay(hud.transform, physicsController);
+            ContactPointIndicator contactIndicator = ConfigureContactPointIndicator(root.transform, hud.transform, contactMarkerMaterial, indicatorMaterial);
 
             GameObject fieldGoalObject = GetOrCreateChild("FieldGoalController", root.transform);
             FieldGoalController fieldGoalController = EnsureComponent<FieldGoalController>(fieldGoalObject);
@@ -140,6 +179,16 @@ namespace PaperFootball.Editor
                 playerTwoFieldGoalSpot.transform,
                 playerOneGoalTrigger,
                 playerTwoGoalTrigger,
+                footballCollider);
+
+            GameObject interactionObject = GetOrCreateChild("FlickInteractionController", root.transform);
+            FlickInteractionController flickInteraction = EnsureComponent<FlickInteractionController>(interactionObject);
+            flickInteraction.Configure(
+                contactSelector,
+                inputReader,
+                cameraController,
+                contactIndicator,
+                physicsController,
                 footballCollider);
 
             GameObject matchObject = GetOrCreateChild("MatchController", root.transform);
@@ -157,7 +206,8 @@ namespace PaperFootball.Editor
                 fieldGoalController,
                 footballCollider,
                 playerOneStart.transform,
-                playerTwoStart.transform);
+                playerTwoStart.transform,
+                flickInteraction);
 
             MarkDirty(
                 config,
@@ -166,13 +216,20 @@ namespace PaperFootball.Editor
                 playerOneEdge,
                 playerTwoEdge,
                 football,
+                footballVisual,
+                footballFoldLine,
+                footballCornerMark,
                 goalposts,
                 inputObject,
+                contactSelectorObject,
                 boundaryObject,
                 indicatorObject,
                 trajectoryObject,
                 overhangDebugOverlay.gameObject,
+                spinDebugOverlay.gameObject,
+                contactIndicator.gameObject,
                 fieldGoalObject,
+                interactionObject,
                 hud.gameObject,
                 matchObject);
 
@@ -228,11 +285,15 @@ namespace PaperFootball.Editor
                 config.Rules.targetScore = 21;
                 config.Rules.requiredOverhangPercent = 0f;
                 config.Rules.minimumSupportedPercent = 0.25f;
-                config.Rules.maximumFlickForce = 18f;
-                config.Rules.minimumFlickForce = 1.5f;
+                config.Rules.maximumFlickForce = 4f;
+                config.Rules.minimumFlickForce = 0.35f;
+                config.Rules.flickForceResponseExponent = 1.6f;
                 config.Rules.maximumDragDistance = 2.5f;
                 config.Rules.footballStoppingThreshold = 0.08f;
                 config.Rules.angularStoppingThreshold = 0.25f;
+                config.Rules.footballAngularDamping = 0.8f;
+                config.Rules.contactYawTorqueMultiplier = 2.5f;
+                config.Rules.maximumFootballAngularVelocity = 24f;
                 config.Rules.requiredStillTime = 0.35f;
                 config.Rules.fallHeight = -1.2f;
                 config.Rules.fieldGoalTimeLimit = 6f;
@@ -248,6 +309,21 @@ namespace PaperFootball.Editor
                 config.Rules.maximumTrajectoryPreviewTime = 2.1f;
                 config.Rules.trajectoryCollisionMask = 0;
                 AssetDatabase.CreateAsset(config, ConfigPath);
+            }
+
+            if (config.Rules.footballAngularDamping <= 0.05f)
+            {
+                config.Rules.footballAngularDamping = 0.8f;
+            }
+
+            if (config.Rules.contactYawTorqueMultiplier <= 0f)
+            {
+                config.Rules.contactYawTorqueMultiplier = 2.5f;
+            }
+
+            if (config.Rules.maximumFootballAngularVelocity <= 0.1f)
+            {
+                config.Rules.maximumFootballAngularVelocity = 24f;
             }
 
             config.Rules.Sanitize();
@@ -448,6 +524,69 @@ namespace PaperFootball.Editor
             return overlay;
         }
 
+        private static FootballSpinDebugOverlay ConfigureSpinDebugOverlay(Transform parent, FootballPhysicsController physicsController)
+        {
+            GameObject overlayObject = GetOrCreateUiChild("SpinDebugOverlay", parent);
+            RectTransform overlayRect = EnsureComponent<RectTransform>(overlayObject);
+            overlayRect.anchorMin = new Vector2(1f, 0f);
+            overlayRect.anchorMax = new Vector2(1f, 0f);
+            overlayRect.pivot = new Vector2(1f, 0f);
+            overlayRect.anchoredPosition = new Vector2(-24f, 120f);
+            overlayRect.sizeDelta = new Vector2(620f, 190f);
+
+            GameObject textObject = GetOrCreateUiChild("SpinDebugText", overlayObject.transform);
+            Text text = EnsureComponent<Text>(textObject);
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 16;
+            text.color = new Color(1f, 0.92f, 0.62f);
+            text.alignment = TextAnchor.LowerRight;
+            text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+
+            RectTransform textRect = EnsureComponent<RectTransform>(textObject);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.pivot = new Vector2(1f, 0f);
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            FootballSpinDebugOverlay overlay = EnsureComponent<FootballSpinDebugOverlay>(overlayObject);
+            overlay.Configure(physicsController, text, true);
+            return overlay;
+        }
+
+        private static ContactPointIndicator ConfigureContactPointIndicator(Transform parent, Transform hudParent, Material markerMaterial, Material lineMaterial)
+        {
+            GameObject indicatorObject = GetOrCreateChild("ContactPointIndicator", parent);
+
+            GameObject markerObject = GetOrCreatePrimitive("ContactPointMarker", PrimitiveType.Sphere, indicatorObject.transform);
+            markerObject.transform.localScale = Vector3.one * 0.075f;
+            SetMaterial(markerObject, markerMaterial);
+            if (markerObject.TryGetComponent(out Collider markerCollider))
+            {
+                Object.DestroyImmediate(markerCollider);
+            }
+
+            GameObject yawObject = GetOrCreateChild("ContactYawPreview", indicatorObject.transform);
+            LineRenderer yawLine = EnsureComponent<LineRenderer>(yawObject);
+            yawLine.sharedMaterial = lineMaterial;
+            yawLine.useWorldSpace = true;
+            yawLine.positionCount = 0;
+            yawLine.startWidth = 0.025f;
+            yawLine.endWidth = 0.01f;
+            yawLine.enabled = false;
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Text feedback = ConfigureText("ContactFeedback", hudParent, new Vector2(24f, -326f), font, 18, TextAnchor.UpperLeft);
+            feedback.rectTransform.sizeDelta = new Vector2(560f, 120f);
+            feedback.enabled = false;
+
+            ContactPointIndicator indicator = EnsureComponent<ContactPointIndicator>(indicatorObject);
+            indicator.Configure(markerObject.transform, feedback, yawLine);
+            return indicator;
+        }
+
         private static Text ConfigureText(string name, Transform parent, Vector2 anchoredPosition, Font font, int fontSize, TextAnchor alignment)
         {
             GameObject textObject = GetOrCreateUiChild(name, parent);
@@ -558,6 +697,27 @@ namespace PaperFootball.Editor
             return button;
         }
 
+        private static GameObject ConfigureFootballSpinReferencePart(
+            Transform football,
+            string name,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Material material)
+        {
+            GameObject part = GetOrCreatePrimitive(name, PrimitiveType.Cube, football);
+            part.transform.localPosition = localPosition;
+            part.transform.localRotation = Quaternion.identity;
+            part.transform.localScale = localScale;
+            SetMaterial(part, material);
+
+            if (part.TryGetComponent(out Collider collider))
+            {
+                Object.DestroyImmediate(collider);
+            }
+
+            return part;
+        }
+
         private static void ConfigureBuildSettings()
         {
             List<EditorBuildSettingsScene> scenes = new()
@@ -660,6 +820,14 @@ namespace PaperFootball.Editor
             }
 
             return target.AddComponent<T>();
+        }
+
+        private static void RemoveComponent<T>(GameObject target) where T : Component
+        {
+            if (target.TryGetComponent(out T component))
+            {
+                Object.DestroyImmediate(component);
+            }
         }
 
         private static void SetMaterial(GameObject target, Material material)

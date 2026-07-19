@@ -13,6 +13,31 @@ namespace PaperFootball.Tabletop.FieldGoals
             float normalizedPower,
             float dragDistance,
             Vector3 totalImpulse)
+            : this(
+                isValid,
+                horizontalDirection,
+                forwardImpulse,
+                upwardImpulse,
+                launchAngle,
+                normalizedPower,
+                dragDistance,
+                totalImpulse,
+                Vector3.zero,
+                false)
+        {
+        }
+
+        public FieldGoalKickResult(
+            bool isValid,
+            Vector3 horizontalDirection,
+            float forwardImpulse,
+            float upwardImpulse,
+            float launchAngle,
+            float normalizedPower,
+            float dragDistance,
+            Vector3 totalImpulse,
+            Vector3 contactPointWorld,
+            bool hasContactPoint)
         {
             IsValid = isValid;
             HorizontalDirection = horizontalDirection;
@@ -22,6 +47,8 @@ namespace PaperFootball.Tabletop.FieldGoals
             NormalizedPower = normalizedPower;
             DragDistance = dragDistance;
             TotalImpulse = totalImpulse;
+            ContactPointWorld = contactPointWorld;
+            HasContactPoint = hasContactPoint;
         }
 
         public bool IsValid { get; }
@@ -32,6 +59,8 @@ namespace PaperFootball.Tabletop.FieldGoals
         public float NormalizedPower { get; }
         public float DragDistance { get; }
         public Vector3 TotalImpulse { get; }
+        public Vector3 ContactPointWorld { get; }
+        public bool HasContactPoint { get; }
 
         public static FieldGoalKickResult Invalid()
         {

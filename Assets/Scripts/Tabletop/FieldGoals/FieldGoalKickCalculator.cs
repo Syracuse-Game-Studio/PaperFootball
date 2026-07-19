@@ -41,7 +41,9 @@ namespace PaperFootball.Tabletop.FieldGoals
                 launchAngle,
                 normalizedPower,
                 dragDistance,
-                totalImpulse);
+                totalImpulse,
+                command.ContactPointWorld,
+                command.HasContactPoint);
         }
     }
 }
