@@ -61,6 +61,36 @@ namespace PaperFootball.Tabletop.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator ReapplyingWaitingForFlickDoesNotRestartContactSelection()
+        {
+            InteractionFixture fixture = InteractionFixture.Create();
+            try
+            {
+                PaperFootballMatch match = new(new PaperFootballRuleSet());
+                int stateChangeCount = 0;
+                fixture.Controller.StateChanged += _ => stateChangeCount++;
+
+                fixture.Controller.ApplyMatchState(match);
+                yield return null;
+
+                Assert.That(fixture.Controller.State, Is.EqualTo(FlickInteractionState.WaitingForContact));
+                Assert.That(stateChangeCount, Is.EqualTo(1));
+
+                fixture.Controller.ApplyMatchState(match);
+                yield return null;
+
+                Assert.That(fixture.Controller.State, Is.EqualTo(FlickInteractionState.WaitingForContact));
+                Assert.That(stateChangeCount, Is.EqualTo(1));
+                Assert.IsTrue(fixture.Selector.InputEnabled);
+                Assert.IsFalse(fixture.InputReader.InputEnabled);
+            }
+            finally
+            {
+                fixture.Destroy();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator ContactSelectionTargetsFootballBehindGoalpostColliders()
         {
             GameObject football = GameObject.CreatePrimitive(PrimitiveType.Cube);

@@ -2,6 +2,7 @@ using System;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Presentation;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.Input
@@ -23,10 +24,12 @@ namespace PaperFootball.Tabletop.Input
         private MatchPhase? lastPhase;
         private bool isSubscribed;
         private bool inputSuppressed;
+        private FootballShotType currentShotType = FootballShotType.FlatTableShot;
 
         public FlickInteractionState State => stateMachine.CurrentState;
         public bool HasSelectedContactPoint => hasSelectedContactPoint;
         public SelectedContactPoint SelectedContactPoint => selectedContactPoint;
+        public FootballShotType CurrentShotType => currentShotType;
 
         public event Action<FlickCommand> DragChanged;
         public event Action<FlickCommand> FlickReleased;
@@ -82,7 +85,16 @@ namespace PaperFootball.Tabletop.Input
             {
                 if (playerChanged || phaseChanged || !hasSelectedContactPoint)
                 {
-                    BeginContactSelection();
+                    bool alreadySelectingContact = State == FlickInteractionState.WaitingForContact ||
+                                                   State == FlickInteractionState.SelectingContact;
+                    if (playerChanged || phaseChanged || !alreadySelectingContact)
+                    {
+                        BeginContactSelection();
+                    }
+                    else
+                    {
+                        ApplyStateSideEffects();
+                    }
                 }
                 else
                 {
@@ -123,6 +135,11 @@ namespace PaperFootball.Tabletop.Input
 
         public void SetInputSuppressed(bool suppressed)
         {
+            if (inputSuppressed == suppressed)
+            {
+                return;
+            }
+
             inputSuppressed = suppressed;
             if (inputSuppressed)
             {
@@ -141,6 +158,14 @@ namespace PaperFootball.Tabletop.Input
             {
                 ApplyStateSideEffects();
             }
+        }
+
+        public void SetShotType(FootballShotType shotType)
+        {
+            currentShotType = shotType == FootballShotType.AirFlickShot || shotType == FootballShotType.FieldGoalKick
+                ? shotType
+                : FootballShotType.FlatTableShot;
+            flickInputReader?.SetShotType(currentShotType);
         }
 
         public bool TryConfirmContactPoint(SelectedContactPoint contactPoint)
@@ -391,10 +416,12 @@ namespace PaperFootball.Tabletop.Input
 
             if (hasSelectedContactPoint)
             {
+                flickInputReader.SetShotType(currentShotType);
                 flickInputReader.SetContactPointOverride(selectedContactPoint.GetWorldPoint());
             }
             else
             {
+                flickInputReader.SetShotType(currentShotType);
                 flickInputReader.ClearContactPointOverride();
             }
         }

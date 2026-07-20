@@ -4,6 +4,8 @@
 
 > Phase 2 note: `Assets/Docs/RoguelikePhase2HandoffReport.md` documents the roguelike run foundation added after this original implementation report.
 
+> Air Flick note: `Assets/Docs/AirFlickAndFlatShotHandoffReport.md` documents the later Flat Shot / Air Flick shot-type implementation, field-goal scoring restriction, AI integration, tests, and validation limits.
+
 Date prepared: 2026-07-17
 
 ## Purpose
@@ -253,19 +255,20 @@ Coverage includes:
 
 ## Latest Validation Results
 
-The latest validation runs completed successfully after the visible-spin readability update:
+The latest validation runs completed successfully after the Flat Shot / Air Flick update:
 
 - Unity batch compile: exit code `0`; log reported `Tundra build success` and `Batchmode quit successfully`.
-- Scene scaffolder: exit code `0`; rebuilt `Assets/Scenes/PaperFootballGame.unity` and `Assets/Scenes/PaperFootballLauncher.unity`.
-- Edit Mode tests: 40 passed, 0 failed.
-- Play Mode tests: 21 passed, 0 failed.
+- Scene scaffolder after the editor was closed: exit code `0`; rebuilt `Assets/Scenes/PaperFootballGame.unity` and `Assets/Scenes/PaperFootballLauncher.unity`.
+- Edit Mode tests: 60 passed, 0 failed.
+- Play Mode tests: 33 passed, 0 failed.
+- Serialized missing-script scan: clean.
 - `git diff --check`: no whitespace errors; line-ending normalization warnings only.
 
 No C# compiler errors or C# compiler warnings were found in the targeted compile log scan.
 
 Log note: Unity emitted `[Licensing::Module] Error: Access token is unavailable; failed to update` during batch runs. This did not block compilation, scaffolding, or tests.
 
-Process note: the Play Mode run saved a passing Unity `TestResults.xml` but did not exit before the shell timeout, so the leftover hidden Unity batch process was stopped after the results were verified.
+Process note: the Play Mode run saved a passing Unity `TestResults.xml` but did not exit after cleanup, so the leftover hidden Unity batch process was stopped after the results were verified.
 
 ## Current Default Rule Values
 

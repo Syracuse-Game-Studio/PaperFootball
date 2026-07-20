@@ -3,6 +3,7 @@ using NUnit.Framework;
 using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -45,6 +46,78 @@ namespace PaperFootball.Tabletop.PlayModeTests
             yield return new WaitForFixedUpdate();
 
             Assert.That(body.linearVelocity.z, Is.GreaterThan(0f));
+            Object.Destroy(football);
+        }
+
+        [UnityTest]
+        public IEnumerator FlatTableShotDoesNotAddIntentionalUpwardVelocity()
+        {
+            GameObject football = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Rigidbody body = football.AddComponent<Rigidbody>();
+            FootballPhysicsController controller = football.AddComponent<FootballPhysicsController>();
+            controller.Configure(new PaperFootballRuleSet());
+            body.useGravity = false;
+
+            FlickCommand command = new(
+                true,
+                Vector3.zero,
+                new Vector3(0f, 0f, -1f),
+                new Vector3(0f, 0f, -1f),
+                Vector3.forward,
+                2f,
+                1f,
+                0.2f,
+                0.5f,
+                football.transform.position,
+                FootballShotType.FlatTableShot);
+            controller.Flick(command);
+
+            yield return new WaitForFixedUpdate();
+
+            Assert.That(body.linearVelocity.y, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(controller.LastShotType, Is.EqualTo(FootballShotType.FlatTableShot));
+            Object.Destroy(football);
+        }
+
+        [UnityTest]
+        public IEnumerator AirFlickShotLaunchesUpwardThroughSharedPhysicsController()
+        {
+            GameObject football = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Rigidbody body = football.AddComponent<Rigidbody>();
+            FootballPhysicsController controller = football.AddComponent<FootballPhysicsController>();
+            controller.Configure(new PaperFootballRuleSet());
+            body.useGravity = false;
+            AirFlickShotSettings settings = ScriptableObject.CreateInstance<AirFlickShotSettings>();
+
+            FlickCommand command = new(
+                true,
+                Vector3.zero,
+                new Vector3(0f, 0f, -1f),
+                new Vector3(0f, 0f, -1f),
+                Vector3.forward,
+                2f,
+                1f,
+                0.2f,
+                0.5f,
+                football.transform.position + Vector3.right * 0.25f,
+                FootballShotType.AirFlickShot);
+            AirFlickShotResult result = AirFlickShotCalculator.Calculate(
+                command,
+                new PaperFootballRuleSet(),
+                settings,
+                football.GetComponent<Collider>(),
+                null,
+                ShotExecutionContext.Normal(FootballShotType.AirFlickShot, PaperFootballPlayer.PlayerOne, 1, 0, 1, 1),
+                generateLandingVariance: false);
+
+            controller.AirFlick(result);
+            yield return new WaitForFixedUpdate();
+
+            Assert.That(body.linearVelocity.y, Is.GreaterThan(0f));
+            Assert.That(controller.LastShotType, Is.EqualTo(FootballShotType.AirFlickShot));
+            Assert.IsTrue(controller.HasLastContactPoint);
+
+            Object.Destroy(settings);
             Object.Destroy(football);
         }
 

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d40952bd40934ed99c0f5d7ed7472542, type: 3}
+  m_Name: AirFlickShotSettings
+  m_EditorClassIdentifier: 
+  minimumLaunchAngle: 18
+  maximumLaunchAngle: 42
+  minimumUpwardImpulse: 0.35
+  maximumUpwardImpulse: 0.95
+  forwardImpulseMultiplier: 0.72
+  contactLiftInfluence: 0.18
+  sideContactStabilityPenalty: 0.35
+  forceVarianceMultiplier: 1.25
+  directionVarianceMultiplier: 1.5
+  contactVarianceMultiplier: 1.5
+  minimumAirborneHeight: 0.08
+  minimumPositiveVerticalVelocity: 0.2
+  landingBounceMultiplierMin: 0.9
+  landingBounceMultiplierMax: 1.18
+  landingTangentImpulseRange: 0.18
+  landingYawImpulseRange: 0.75
+  landingFrictionMultiplierMin: 0.85
+  landingFrictionMultiplierMax: 1.15
+  landingDirectionOffsetDegrees: 8
+  maximumLandingCorrectionImpulse: 0.3
+  landingVarianceMultiplier: 1
+  trajectoryPreviewDuration: 1.45
+  trajectoryPreviewPointCount: 22
+  trajectoryPreviewTimeStep: 0.065

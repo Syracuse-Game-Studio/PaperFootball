@@ -25,6 +25,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
         TouchdownScoring,
         FieldGoalForce,
         FieldGoalDirectionVariance,
+        AirFlickForwardImpulseMultiplier,
+        AirFlickUpwardImpulseMultiplier,
+        AirFlickLaunchAngleAdd,
+        AirFlickForceVarianceMultiplier,
+        AirFlickDirectionVarianceMultiplier,
+        AirFlickContactVarianceMultiplier,
+        AirFlickLandingVarianceMultiplier,
+        AirFlickBounceMultiplier,
+        AirFlickLandingYawMultiplier,
+        AirFlickPreviewAccuracy,
         ConsumableCapacity,
         RewardGeneration,
         EncounterRules,
@@ -124,7 +134,7 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Upgrade", fileName = "FootballUpgrade")]
-    public class FootballUpgradeDefinition : ScriptableObject
+    public partial class FootballUpgradeDefinition
     {
         [SerializeField] private string stableId = "upgrade";
         [SerializeField] private string displayName = "Upgrade";
@@ -329,7 +339,7 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Upgrade Catalog", fileName = "UpgradeCatalog")]
-    public class UpgradeCatalog : ScriptableObject
+    public partial class UpgradeCatalog
     {
         [SerializeField] private FootballUpgradeDefinition[] upgrades = Array.Empty<FootballUpgradeDefinition>();
 
@@ -423,6 +433,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
             float touchdownScoringMultiplier,
             float fieldGoalForceMultiplier,
             float fieldGoalDirectionVarianceScale,
+            float airFlickForwardImpulseMultiplier,
+            float airFlickUpwardImpulseMultiplier,
+            float airFlickLaunchAngleAdd,
+            float airFlickForceVarianceMultiplier,
+            float airFlickDirectionVarianceMultiplier,
+            float airFlickContactVarianceMultiplier,
+            float airFlickLandingVarianceMultiplier,
+            float airFlickBounceMultiplier,
+            float airFlickLandingYawMultiplier,
+            float airFlickPreviewAccuracyBonus,
             float previewAccuracyBonus,
             Vector3 centerOfMassOffset)
         {
@@ -439,6 +459,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
             TouchdownScoringMultiplier = touchdownScoringMultiplier;
             FieldGoalForceMultiplier = fieldGoalForceMultiplier;
             FieldGoalDirectionVarianceScale = fieldGoalDirectionVarianceScale;
+            AirFlickForwardImpulseMultiplier = airFlickForwardImpulseMultiplier;
+            AirFlickUpwardImpulseMultiplier = airFlickUpwardImpulseMultiplier;
+            AirFlickLaunchAngleAdd = airFlickLaunchAngleAdd;
+            AirFlickForceVarianceMultiplier = airFlickForceVarianceMultiplier;
+            AirFlickDirectionVarianceMultiplier = airFlickDirectionVarianceMultiplier;
+            AirFlickContactVarianceMultiplier = airFlickContactVarianceMultiplier;
+            AirFlickLandingVarianceMultiplier = airFlickLandingVarianceMultiplier;
+            AirFlickBounceMultiplier = airFlickBounceMultiplier;
+            AirFlickLandingYawMultiplier = airFlickLandingYawMultiplier;
+            AirFlickPreviewAccuracyBonus = airFlickPreviewAccuracyBonus;
             PreviewAccuracyBonus = previewAccuracyBonus;
             CenterOfMassOffset = centerOfMassOffset;
         }
@@ -456,6 +486,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
         public float TouchdownScoringMultiplier { get; }
         public float FieldGoalForceMultiplier { get; }
         public float FieldGoalDirectionVarianceScale { get; }
+        public float AirFlickForwardImpulseMultiplier { get; }
+        public float AirFlickUpwardImpulseMultiplier { get; }
+        public float AirFlickLaunchAngleAdd { get; }
+        public float AirFlickForceVarianceMultiplier { get; }
+        public float AirFlickDirectionVarianceMultiplier { get; }
+        public float AirFlickContactVarianceMultiplier { get; }
+        public float AirFlickLandingVarianceMultiplier { get; }
+        public float AirFlickBounceMultiplier { get; }
+        public float AirFlickLandingYawMultiplier { get; }
+        public float AirFlickPreviewAccuracyBonus { get; }
         public float PreviewAccuracyBonus { get; }
         public Vector3 CenterOfMassOffset { get; }
 
@@ -473,6 +513,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
             1f,
             1f,
             1f,
+            1f,
+            1f,
+            0f,
+            1f,
+            1f,
+            1f,
+            1f,
+            1f,
+            1f,
+            0f,
             0f,
             Vector3.zero);
 
@@ -511,6 +561,16 @@ namespace PaperFootball.Tabletop.Roguelike.Modifiers
                 ModifierPipeline.Compose(1f, modifiers, FootballModifierType.TouchdownScoring, 0.1f, 4f),
                 ModifierPipeline.Compose(1f, modifiers, FootballModifierType.FieldGoalForce, 0.1f, 4f),
                 ModifierPipeline.Compose(1f, modifiers, FootballModifierType.FieldGoalDirectionVariance, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickForwardImpulseMultiplier, 0.05f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickUpwardImpulseMultiplier, 0.05f, 4f),
+                ModifierPipeline.Compose(0f, modifiers, FootballModifierType.AirFlickLaunchAngleAdd, -20f, 20f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickForceVarianceMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickDirectionVarianceMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickContactVarianceMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickLandingVarianceMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickBounceMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(1f, modifiers, FootballModifierType.AirFlickLandingYawMultiplier, 0f, 4f),
+                ModifierPipeline.Compose(0f, modifiers, FootballModifierType.AirFlickPreviewAccuracy, -1f, 1f),
                 ModifierPipeline.Compose(0f, modifiers, FootballModifierType.PreviewAccuracy, -1f, 1f),
                 new Vector3(
                     ModifierPipeline.Compose(0f, modifiers, FootballModifierType.CenterOfMassX, -0.25f, 0.25f),

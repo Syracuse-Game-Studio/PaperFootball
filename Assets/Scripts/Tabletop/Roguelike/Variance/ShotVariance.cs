@@ -6,7 +6,7 @@ using UnityEngine;
 namespace PaperFootball.Tabletop.Roguelike.Variance
 {
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Shot Variance Settings", fileName = "ShotVarianceSettings")]
-    public class ShotVarianceSettings : ScriptableObject
+    public partial class ShotVarianceSettings
     {
         [SerializeField] private bool varianceEnabled = true;
         [SerializeField] private float forceVariancePercent = 0.03f;
@@ -79,6 +79,19 @@ namespace PaperFootball.Tabletop.Roguelike.Variance
         public string AccuracyRating { get; }
 
         public static ShotVarianceTuning Disabled => new(false, 0f, 0f, 0f, false, "Perfect");
+
+        public ShotVarianceTuning Scaled(float forceScale, float directionScale, float contactScale, float previewAccuracyBonus = 0f)
+        {
+            float accuracyScore = Mathf.Clamp01(0.5f + previewAccuracyBonus);
+            string rating = accuracyScore >= 0.75f ? "Precise" : accuracyScore <= 0.3f ? "Wild" : AccuracyRating;
+            return new ShotVarianceTuning(
+                VarianceEnabled,
+                ForceVariancePercent * Mathf.Max(0f, forceScale),
+                DirectionVarianceDegrees * Mathf.Max(0f, directionScale),
+                ContactPointVarianceRadius * Mathf.Max(0f, contactScale),
+                RevealSampledResult,
+                rating);
+        }
     }
 
     public readonly struct ResolvedFlickParameters
@@ -142,7 +155,8 @@ namespace PaperFootball.Tabletop.Roguelike.Variance
                 BaseCommand.DragDistance,
                 BaseCommand.DragDuration,
                 BaseCommand.Strength01,
-                FinalContactPointWorld);
+                FinalContactPointWorld,
+                BaseCommand.ShotType);
         }
 
         public static ResolvedFlickParameters FromUnmodified(FlickCommand command, int streamSeed = 0, int flickSequenceNumber = 0)

@@ -9,6 +9,7 @@ using PaperFootball.Tabletop.Presentation;
 using PaperFootball.Tabletop.Roguelike.Modifiers;
 using PaperFootball.Tabletop.Roguelike.Random;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.Roguelike.Opponents
@@ -21,7 +22,7 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Opponent Profile", fileName = "OpponentProfile")]
-    public class OpponentProfile : ScriptableObject
+    public partial class OpponentProfile
     {
         [SerializeField] private string stableId = "opponent";
         [SerializeField] private string displayName = "Opponent";
@@ -83,7 +84,7 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Opponent Catalog", fileName = "OpponentCatalog")]
-    public class OpponentCatalog : ScriptableObject
+    public partial class OpponentCatalog
     {
         [SerializeField] private OpponentProfile[] opponents = Array.Empty<OpponentProfile>();
 
@@ -183,21 +184,12 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
                 Vector3 direction = BuildDirection(baseDirection, context.Profile, runtimeRandom);
                 float force = BuildForce(rules, context.Profile, runtimeRandom);
                 Vector3 contact = BuildContactPoint(context.FootballCollider, context.Profile, direction, runtimeRandom);
-                float strength01 = Mathf.InverseLerp(rules.minimumFlickForce, rules.maximumFlickForce, force);
-                float dragDistance = Mathf.Lerp(rules.minimumDragDistance, rules.maximumDragDistance, strength01);
-                Vector3 dragStart = footballPosition;
-                Vector3 dragCurrent = dragStart - direction * Mathf.Max(rules.minimumDragDistance, dragDistance);
-                candidates.Add(new FlickCommand(
-                    true,
-                    dragStart,
-                    dragCurrent,
-                    dragCurrent,
-                    direction,
-                    force,
-                    dragDistance,
-                    0.25f,
-                    strength01,
-                    contact));
+                candidates.Add(BuildCommand(footballPosition, direction, force, contact, rules, FootballShotType.FlatTableShot));
+
+                if (context.ObstacleBounds.Count > 0 || runtimeRandom.Value() < context.Profile.RiskTolerance * 0.35f)
+                {
+                    candidates.Add(BuildCommand(footballPosition, direction, force, contact, rules, FootballShotType.AirFlickShot));
+                }
             }
 
             FlickCommand selected = candidates
@@ -247,6 +239,32 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
             return collider.ClosestPoint(world);
         }
 
+        private static FlickCommand BuildCommand(
+            Vector3 footballPosition,
+            Vector3 direction,
+            float force,
+            Vector3 contact,
+            PaperFootballRuleSet rules,
+            FootballShotType shotType)
+        {
+            float strength01 = Mathf.InverseLerp(rules.minimumFlickForce, rules.maximumFlickForce, force);
+            float dragDistance = Mathf.Lerp(rules.minimumDragDistance, rules.maximumDragDistance, strength01);
+            Vector3 dragStart = footballPosition;
+            Vector3 dragCurrent = dragStart - direction * Mathf.Max(rules.minimumDragDistance, dragDistance);
+            return new FlickCommand(
+                true,
+                dragStart,
+                dragCurrent,
+                dragCurrent,
+                direction,
+                force,
+                dragDistance,
+                0.25f,
+                strength01,
+                contact,
+                shotType);
+        }
+
         private static Bounds GetLocalBounds(Collider collider)
         {
             if (collider is BoxCollider box)
@@ -272,7 +290,55 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
             float powerFit = 1f - Mathf.Abs(command.Strength01 - context.Profile.PreferredPower);
             float riskBonus = context.Profile.RiskTolerance * (1f - edgeSafety);
             float spinFit = Mathf.Clamp01(Vector3.Distance(command.ContactPointWorld, context.FootballCollider.bounds.center));
-            return alignment * 3f + edgeSafety * (1f - context.Profile.RiskTolerance) + powerFit + riskBonus + spinFit * Mathf.Abs(context.Profile.PreferredSpin);
+            bool pathBlocked = PathBlockedByObstacle(command, context);
+            float shotTypeScore = 0f;
+            if (command.ShotType == FootballShotType.AirFlickShot)
+            {
+                shotTypeScore += pathBlocked ? 2f + context.Profile.ObstacleUsePreference : -0.45f * (1f - context.Profile.RiskTolerance);
+                shotTypeScore -= (1f - edgeSafety) * 1.25f;
+            }
+            else if (pathBlocked)
+            {
+                shotTypeScore -= 2.2f + context.Profile.ObstacleUsePreference;
+            }
+
+            return alignment * 3f +
+                   edgeSafety * (1f - context.Profile.RiskTolerance) +
+                   powerFit +
+                   riskBonus +
+                   spinFit * Mathf.Abs(context.Profile.PreferredSpin) +
+                   shotTypeScore;
+        }
+
+        private static bool PathBlockedByObstacle(FlickCommand command, OpponentDecisionContext context)
+        {
+            if (context.ObstacleBounds == null || context.ObstacleBounds.Count == 0)
+            {
+                return false;
+            }
+
+            Vector3 origin = context.FootballCollider.bounds.center;
+            Vector3 direction = command.Direction;
+            direction.y = 0f;
+            if (direction.sqrMagnitude <= 0.000001f)
+            {
+                return false;
+            }
+
+            direction.Normalize();
+            float length = Mathf.Max(0.5f, command.Force * 1.2f);
+            Ray ray = new(origin, direction);
+            foreach (Bounds obstacle in context.ObstacleBounds)
+            {
+                Bounds expanded = obstacle;
+                expanded.Expand(new Vector3(0.16f, 0.2f, 0.16f));
+                if (expanded.IntersectRay(ray, out float distance) && distance <= length)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 

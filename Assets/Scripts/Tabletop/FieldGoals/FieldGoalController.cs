@@ -1,5 +1,6 @@
 using System;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.FieldGoals
@@ -15,10 +16,12 @@ namespace PaperFootball.Tabletop.FieldGoals
         private bool attemptActive;
         private bool scoredThisAttempt;
         private PaperFootballPlayer activePlayer;
+        private ShotExecutionContext activeShotContext = ShotExecutionContext.None;
 
         public bool AttemptActive => attemptActive;
         public bool ScoredThisAttempt => scoredThisAttempt;
         public PaperFootballPlayer ActivePlayer => activePlayer;
+        public ShotExecutionContext ActiveShotContext => activeShotContext;
 
         public event Action FieldGoalScored;
 
@@ -58,14 +61,30 @@ namespace PaperFootball.Tabletop.FieldGoals
 
         public void BeginAttempt(PaperFootballPlayer player)
         {
+            BeginAttempt(player, ShotExecutionContext.FieldGoal(player, 0, 0, 0, 0));
+        }
+
+        public void BeginAttempt(PaperFootballPlayer player, ShotExecutionContext shotContext)
+        {
             activePlayer = player;
             attemptActive = true;
             scoredThisAttempt = false;
+            activeShotContext = shotContext.ShotType == FootballShotType.FieldGoalKick
+                ? shotContext
+                : ShotExecutionContext.FieldGoal(player, shotContext.RunSeed, shotContext.EncounterIndex, shotContext.PossessionNumber, shotContext.ShotSequenceNumber);
         }
 
         public void EndAttempt()
         {
             attemptActive = false;
+            activeShotContext = ShotExecutionContext.None;
+        }
+
+        public void SetNonScoringShotContext(ShotExecutionContext shotContext)
+        {
+            attemptActive = false;
+            scoredThisAttempt = false;
+            activeShotContext = shotContext;
         }
 
         public Transform GetKickSpot(PaperFootballPlayer player)
@@ -75,7 +94,11 @@ namespace PaperFootball.Tabletop.FieldGoals
 
         public void ReportGoalMouthEntered(PaperFootballPlayer scoringPlayer, Collider candidateFootball)
         {
-            if (!attemptActive || scoredThisAttempt || scoringPlayer != activePlayer)
+            if (!attemptActive ||
+                scoredThisAttempt ||
+                scoringPlayer != activePlayer ||
+                activeShotContext.ShotType != FootballShotType.FieldGoalKick ||
+                !activeShotContext.CanScoreFieldGoal)
             {
                 return;
             }

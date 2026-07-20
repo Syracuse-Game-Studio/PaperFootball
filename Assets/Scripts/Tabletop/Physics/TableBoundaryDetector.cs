@@ -8,6 +8,7 @@ namespace PaperFootball.Tabletop.Physics
         [SerializeField] private Collider tableCollider;
         [SerializeField] private float fallHeight = -1.2f;
 
+        public Collider TableCollider => tableCollider;
         public Bounds TableBounds => tableCollider != null ? tableCollider.bounds : new Bounds(Vector3.zero, Vector3.zero);
         public float TableTopY => tableCollider != null ? tableCollider.bounds.max.y : 0f;
 

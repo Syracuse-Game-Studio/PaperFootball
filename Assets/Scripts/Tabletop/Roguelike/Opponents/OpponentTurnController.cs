@@ -3,6 +3,7 @@ using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.Match;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Presentation;
+using PaperFootball.Tabletop.Roguelike.Encounters;
 using PaperFootball.Tabletop.Roguelike.Random;
 using PaperFootball.Tabletop.Rules;
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
         [SerializeField] private Collider footballCollider;
         [SerializeField] private ContactPointIndicator contactPointIndicator;
         [SerializeField] private FlickAimIndicator aimIndicator;
+        [SerializeField] private ObstacleLayoutController obstacleLayoutController;
         [SerializeField] private bool aiEnabled;
         [SerializeField] private bool fastAi;
 
@@ -33,13 +35,20 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
             FootballPhysicsController physicsController,
             Collider targetFootball,
             ContactPointIndicator contactIndicator,
-            FlickAimIndicator flickIndicator)
+            FlickAimIndicator flickIndicator,
+            ObstacleLayoutController obstacleController = null)
         {
             matchController = match;
             footballPhysics = physicsController;
             footballCollider = targetFootball;
             contactPointIndicator = contactIndicator;
             aimIndicator = flickIndicator;
+            obstacleLayoutController = obstacleController;
+        }
+
+        public void SetObstacleLayoutController(ObstacleLayoutController obstacleController)
+        {
+            obstacleLayoutController = obstacleController;
         }
 
         public void SetRunContext(int seed, int index, Bounds currentTableBounds)
@@ -120,7 +129,8 @@ namespace PaperFootball.Tabletop.Roguelike.Opponents
                 rules,
                 PaperFootballPlayer.PlayerTwo,
                 possessionNumber,
-                encounterIndex);
+                encounterIndex,
+                obstacleLayoutController != null ? obstacleLayoutController.GetActiveBounds() : null);
             OpponentDecision decision = OpponentDecisionService.Decide(context, new DeterministicRunRandom(seed));
 
             if (decision.IsValid)

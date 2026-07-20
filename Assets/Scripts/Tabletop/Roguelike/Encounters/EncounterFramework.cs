@@ -40,7 +40,7 @@ namespace PaperFootball.Tabletop.Roguelike.Encounters
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Table Surface", fileName = "TableSurface")]
-    public class TableSurfaceDefinition : ScriptableObject
+    public partial class TableSurfaceDefinition
     {
         [SerializeField] private string stableId = "normal_desk";
         [SerializeField] private string displayName = "Normal Desk";
@@ -87,7 +87,7 @@ namespace PaperFootball.Tabletop.Roguelike.Encounters
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Table Surface Catalog", fileName = "TableSurfaceCatalog")]
-    public class TableSurfaceCatalog : ScriptableObject
+    public partial class TableSurfaceCatalog
     {
         [SerializeField] private TableSurfaceDefinition[] surfaces = Array.Empty<TableSurfaceDefinition>();
 
@@ -119,7 +119,7 @@ namespace PaperFootball.Tabletop.Roguelike.Encounters
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Obstacle Layout", fileName = "ObstacleLayout")]
-    public class ObstacleLayoutDefinition : ScriptableObject
+    public partial class ObstacleLayoutDefinition
     {
         [SerializeField] private string stableId = "no_obstacles";
         [SerializeField] private string displayName = "No Obstacles";
@@ -152,7 +152,7 @@ namespace PaperFootball.Tabletop.Roguelike.Encounters
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Obstacle Layout Catalog", fileName = "ObstacleLayoutCatalog")]
-    public class ObstacleLayoutCatalog : ScriptableObject
+    public partial class ObstacleLayoutCatalog
     {
         [SerializeField] private ObstacleLayoutDefinition[] layouts = Array.Empty<ObstacleLayoutDefinition>();
 

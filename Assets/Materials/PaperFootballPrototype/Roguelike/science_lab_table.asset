@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 18b28a9e9aacc344fa21789c9f7423c2, type: 3}
+  m_Script: {fileID: 11500000, guid: ffbf9144a35947048bc0ff618599eb12, type: 3}
   m_Name: science_lab_table
   m_EditorClassIdentifier: 
   stableId: science_lab_table

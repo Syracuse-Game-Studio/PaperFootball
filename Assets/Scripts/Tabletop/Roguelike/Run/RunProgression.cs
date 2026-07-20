@@ -194,6 +194,7 @@ namespace PaperFootball.Tabletop.Roguelike.Run
             temporaryPlacementController = placementController;
             precisionTargetZone = targetZone;
             runUi = ui;
+            opponentTurnController?.SetObstacleLayoutController(obstacleLayoutController);
             WireUi();
             if (isActiveAndEnabled)
             {
@@ -249,6 +250,7 @@ namespace PaperFootball.Tabletop.Roguelike.Run
             tableSurfaceApplier?.Apply(null);
             precisionTargetZone?.Hide();
             runUi?.ShowLocalMatchNotice();
+            matchController?.SetAirFlickModifierScales(1f, 1f, 0f, 1f, 1f, 1f, 1f, 1f, 1f, 0f);
             matchController?.SetInputSuppressed(false);
             matchController?.ResetMatchAndBall();
             PublishState();
@@ -443,6 +445,17 @@ namespace PaperFootball.Tabletop.Roguelike.Run
                 evaluation.DirectionVarianceScale,
                 evaluation.ContactPointVarianceScale,
                 evaluation.PreviewAccuracyBonus);
+            matchController?.SetAirFlickModifierScales(
+                evaluation.AirFlickForwardImpulseMultiplier,
+                evaluation.AirFlickUpwardImpulseMultiplier,
+                evaluation.AirFlickLaunchAngleAdd,
+                evaluation.AirFlickForceVarianceMultiplier,
+                evaluation.AirFlickDirectionVarianceMultiplier,
+                evaluation.AirFlickContactVarianceMultiplier,
+                evaluation.AirFlickLandingVarianceMultiplier,
+                evaluation.AirFlickBounceMultiplier,
+                evaluation.AirFlickLandingYawMultiplier,
+                evaluation.PreviewAccuracyBonus + evaluation.AirFlickPreviewAccuracyBonus);
             footballPhysics?.SetCenterOfMassOffset(evaluation.CenterOfMassOffset);
         }
 

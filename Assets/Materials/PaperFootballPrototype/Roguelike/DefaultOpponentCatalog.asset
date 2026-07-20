@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: 64548d4a21a6474f953e1a108a51c9dd, type: 3}
   m_Name: DefaultOpponentCatalog
   m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Opponents:OpponentCatalog
   opponents:

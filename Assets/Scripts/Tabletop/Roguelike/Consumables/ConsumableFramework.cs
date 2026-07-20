@@ -12,7 +12,7 @@ namespace PaperFootball.Tabletop.Roguelike.Consumables
     }
 
     [CreateAssetMenu(menuName = "Paper Football/Roguelike/Consumable", fileName = "Consumable")]
-    public class ConsumableDefinition : ScriptableObject
+    public partial class ConsumableDefinition
     {
         [SerializeField] private string stableId = "consumable";
         [SerializeField] private string displayName = "Consumable";

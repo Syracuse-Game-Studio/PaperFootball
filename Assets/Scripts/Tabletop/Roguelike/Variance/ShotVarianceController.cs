@@ -72,6 +72,17 @@ namespace PaperFootball.Tabletop.Roguelike.Variance
             int possessionNumber,
             string stableIdentifier)
         {
+            return Resolve(command, rules, player, possessionNumber, stableIdentifier, CurrentTuning);
+        }
+
+        public ResolvedFlickParameters Resolve(
+            FlickCommand command,
+            PaperFootballRuleSet rules,
+            PaperFootballPlayer player,
+            int possessionNumber,
+            string stableIdentifier,
+            ShotVarianceTuning tuningOverride)
+        {
             int nextSequence = command.IsValid ? flickSequenceNumber + 1 : flickSequenceNumber;
             int streamSeed = StableSeedUtility.DeriveSeed(
                 runSeed,
@@ -82,7 +93,7 @@ namespace PaperFootball.Tabletop.Roguelike.Variance
                 nextSequence,
                 stableIdentifier);
 
-            ShotVarianceTuning tuning = CurrentTuning;
+            ShotVarianceTuning tuning = tuningOverride;
             IRunRandom random = tuning.VarianceEnabled ? new DeterministicRunRandom(streamSeed) : null;
             ResolvedFlickParameters resolved = FlickParameterResolver.Resolve(
                 command,

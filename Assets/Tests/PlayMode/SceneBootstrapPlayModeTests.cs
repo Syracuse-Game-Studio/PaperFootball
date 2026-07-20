@@ -21,7 +21,9 @@ namespace PaperFootball.Tabletop.PlayModeTests
             MatchController matchController = Object.FindFirstObjectByType<MatchController>();
             FieldGoalController fieldGoalController = Object.FindFirstObjectByType<FieldGoalController>();
             FootballPhysicsController physicsController = Object.FindFirstObjectByType<FootballPhysicsController>();
+            AirFlickLandingController airFlickLandingController = Object.FindFirstObjectByType<AirFlickLandingController>();
             GameHudController hudController = Object.FindFirstObjectByType<GameHudController>();
+            ShotSelectionController shotSelectionController = Object.FindFirstObjectByType<ShotSelectionController>();
             FlickInteractionController interactionController = Object.FindFirstObjectByType<FlickInteractionController>();
             ContactPointSelector contactPointSelector = Object.FindFirstObjectByType<ContactPointSelector>();
             ContactPointIndicator contactPointIndicator = Object.FindFirstObjectByType<ContactPointIndicator>();
@@ -36,7 +38,9 @@ namespace PaperFootball.Tabletop.PlayModeTests
             Assert.IsNotNull(matchController.Match);
             Assert.IsNotNull(fieldGoalController);
             Assert.IsNotNull(physicsController);
+            Assert.IsNotNull(airFlickLandingController);
             Assert.IsNotNull(hudController);
+            Assert.IsNotNull(shotSelectionController);
             Assert.IsNotNull(interactionController);
             Assert.IsNotNull(contactPointSelector);
             Assert.IsNotNull(contactPointIndicator);

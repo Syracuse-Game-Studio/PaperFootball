@@ -3,9 +3,11 @@ using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.FieldGoals;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Presentation;
+using PaperFootball.Tabletop.Roguelike.Random;
 using PaperFootball.Tabletop.Roguelike.Variance;
 using PaperFootball.Tabletop.Rules;
 using PaperFootball.Tabletop.Scoring;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.Match
@@ -14,12 +16,15 @@ namespace PaperFootball.Tabletop.Match
     {
         [Header("Configuration")]
         [SerializeField] private PaperFootballConfig config;
+        [SerializeField] private AirFlickShotSettings airFlickSettings;
 
         [Header("References")]
         [SerializeField] private FootballPhysicsController footballPhysics;
+        [SerializeField] private AirFlickLandingController airFlickLanding;
         [SerializeField] private FootballRestDetector restDetector;
         [SerializeField] private FlickInputReader inputReader;
         [SerializeField] private FlickInteractionController flickInteraction;
+        [SerializeField] private ShotSelectionController shotSelection;
         [SerializeField] private TableBoundaryDetector tableBoundary;
         [SerializeField] private GameHudController hud;
         [SerializeField] private FlickAimIndicator aimIndicator;
@@ -38,12 +43,28 @@ namespace PaperFootball.Tabletop.Match
         private bool inputSuppressed;
         private OverhangDebugSnapshot? latestOverhangSnapshot;
         private float fieldGoalAttemptTimer;
+        private FootballShotType selectedNormalShotType = FootballShotType.FlatTableShot;
+        private ShotExecutionContext activeShotContext = ShotExecutionContext.None;
+        private AirFlickShotSettings runtimeAirFlickSettings;
+        private float airFlickForwardImpulseMultiplier = 1f;
+        private float airFlickUpwardImpulseMultiplier = 1f;
+        private float airFlickLaunchAngleAdd;
+        private float airFlickForceVarianceMultiplier = 1f;
+        private float airFlickDirectionVarianceMultiplier = 1f;
+        private float airFlickContactVarianceMultiplier = 1f;
+        private float airFlickLandingVarianceMultiplier = 1f;
+        private float airFlickBounceMultiplier = 1f;
+        private float airFlickLandingYawMultiplier = 1f;
+        private float airFlickPreviewAccuracyBonus;
 
         public PaperFootballMatch Match => match;
         public PaperFootballRuleSet CurrentRules => rules != null ? rules.Clone() : new PaperFootballRuleSet();
         public Bounds TableBounds => tableBoundary != null ? tableBoundary.TableBounds : new Bounds(Vector3.zero, Vector3.zero);
         public OverhangDebugSnapshot? LatestOverhangSnapshot => latestOverhangSnapshot;
         public TrajectoryPreviewRenderer TrajectoryPreview => trajectoryPreview;
+        public FootballShotType SelectedNormalShotType => selectedNormalShotType;
+        public ShotExecutionContext ActiveShotContext => activeShotContext;
+        public AirFlickShotSettings CurrentAirFlickSettings => runtimeAirFlickSettings != null ? runtimeAirFlickSettings : airFlickSettings;
 
         public event Action<OverhangDebugSnapshot> OverhangSnapshotChanged;
         public event Action<FlickResolutionType> FlickResolved;
@@ -66,13 +87,18 @@ namespace PaperFootball.Tabletop.Match
             Transform p2Start,
             FlickInteractionController interactionController = null,
             ShotVarianceController varianceController = null,
-            ShotUncertaintyPreview shotUncertaintyPreview = null)
+            ShotUncertaintyPreview shotUncertaintyPreview = null,
+            ShotSelectionController shotSelectionController = null,
+            AirFlickLandingController landingController = null,
+            AirFlickShotSettings airFlickShotSettings = null)
         {
             config = rulesConfig;
             footballPhysics = physicsController;
+            airFlickLanding = landingController;
             restDetector = detector;
             inputReader = reader;
             flickInteraction = interactionController;
+            shotSelection = shotSelectionController;
             tableBoundary = boundaryDetector;
             hud = hudController;
             aimIndicator = indicator;
@@ -84,6 +110,8 @@ namespace PaperFootball.Tabletop.Match
             playerTwoStart = p2Start;
             shotVarianceController = varianceController;
             uncertaintyPreview = shotUncertaintyPreview;
+            airFlickSettings = airFlickShotSettings;
+            RebuildRuntimeAirFlickSettings();
         }
 
         private void Awake()
@@ -174,6 +202,11 @@ namespace PaperFootball.Tabletop.Match
             {
                 fieldGoalController.FieldGoalScored += OnFieldGoalScored;
             }
+
+            if (shotSelection != null)
+            {
+                shotSelection.NormalShotTypeChanged += OnNormalShotTypeChanged;
+            }
         }
 
         private void Unsubscribe()
@@ -209,14 +242,24 @@ namespace PaperFootball.Tabletop.Match
             {
                 fieldGoalController.FieldGoalScored -= OnFieldGoalScored;
             }
+
+            if (shotSelection != null)
+            {
+                shotSelection.NormalShotTypeChanged -= OnNormalShotTypeChanged;
+            }
         }
 
         private void ApplyRuntimeConfiguration()
         {
+            EnsureRuntimeReferences();
+            RebuildRuntimeAirFlickSettings();
             footballPhysics?.Configure(rules);
+            airFlickLanding?.Configure(footballPhysics, tableBoundary != null ? tableBoundary.TableCollider : null, runtimeAirFlickSettings);
             restDetector?.Configure(rules);
             inputReader?.SetRules(rules);
+            SetInputShotTypeForCurrentPhase();
             flickInteraction?.ApplyMatchState(match);
+            shotSelection?.ApplyMatchState(match, inputSuppressed, flickInteraction != null ? flickInteraction.State : FlickInteractionState.Disabled);
             overhangDebugOverlay?.Configure(this, null);
             trajectoryPreview?.Configure(footballPhysics != null ? footballPhysics.Rigidbody : null, rules);
         }
@@ -228,8 +271,17 @@ namespace PaperFootball.Tabletop.Match
             if (match != null && match.Phase == MatchPhase.FieldGoalSetup)
             {
                 aimIndicator?.Hide();
-                PreviewFieldGoalKick(command);
+                PreviewFieldGoalKick(command.WithShotType(FootballShotType.FieldGoalKick));
                 uncertaintyPreview?.Show(command, GetVarianceTuning());
+                return;
+            }
+
+            FootballShotType shotType = ResolveNormalShotType(command);
+            if (shotType == FootballShotType.AirFlickShot && command.IsValid)
+            {
+                aimIndicator?.Hide();
+                PreviewAirFlickShot(command.WithShotType(FootballShotType.AirFlickShot), generateLandingVariance: false);
+                uncertaintyPreview?.Show(command, GetVarianceTuning(FootballShotType.AirFlickShot));
                 return;
             }
 
@@ -237,7 +289,7 @@ namespace PaperFootball.Tabletop.Match
             if (command.IsValid)
             {
                 aimIndicator?.Show(command);
-                uncertaintyPreview?.Show(command, GetVarianceTuning());
+                uncertaintyPreview?.Show(command, GetVarianceTuning(FootballShotType.FlatTableShot));
             }
             else
             {
@@ -264,7 +316,7 @@ namespace PaperFootball.Tabletop.Match
 
             if (match.Phase == MatchPhase.FieldGoalSetup)
             {
-                TryLaunchFieldGoalKick(command);
+                TryLaunchFieldGoalKick(command.WithShotType(FootballShotType.FieldGoalKick));
                 return;
             }
 
@@ -286,17 +338,52 @@ namespace PaperFootball.Tabletop.Match
             return kick;
         }
 
+        public AirFlickShotResult PreviewAirFlickShot(FlickCommand command, bool generateLandingVariance = false)
+        {
+            ShotExecutionContext context = ShotExecutionContext.Normal(
+                FootballShotType.AirFlickShot,
+                match != null ? match.CurrentPlayer : PaperFootballPlayer.PlayerOne,
+                shotVarianceController != null ? shotVarianceController.RunSeed : 0,
+                shotVarianceController != null ? shotVarianceController.EncounterIndex : 0,
+                match != null ? match.PossessionNumber : 0,
+                shotVarianceController != null ? shotVarianceController.FlickSequenceNumber + 1 : 0);
+
+            AirFlickShotResult result = AirFlickShotCalculator.Calculate(
+                command.WithShotType(FootballShotType.AirFlickShot),
+                rules,
+                runtimeAirFlickSettings,
+                footballCollider,
+                null,
+                context,
+                generateLandingVariance);
+
+            if (match == null || match.Phase != MatchPhase.WaitingForFlick || !result.IsValid)
+            {
+                trajectoryPreview?.Hide();
+                return result;
+            }
+
+            trajectoryPreview?.ShowAirFlick(result, runtimeAirFlickSettings);
+            return result;
+        }
+
         public bool TryLaunchFieldGoalKick(FlickCommand command)
         {
-            ResolvedFlickParameters resolved = ResolveFlickParameters(command, "field_goal");
-            FieldGoalKickResult kick = FieldGoalKickCalculator.Calculate(resolved.ToFlickCommand(), rules);
+            ResolvedFlickParameters resolved = ResolveFlickParameters(command.WithShotType(FootballShotType.FieldGoalKick), "field_goal", FootballShotType.FieldGoalKick);
+            FieldGoalKickResult kick = FieldGoalKickCalculator.Calculate(resolved.ToFlickCommand().WithShotType(FootballShotType.FieldGoalKick), rules);
             if (!kick.IsValid || match == null || match.Phase != MatchPhase.FieldGoalSetup)
             {
                 trajectoryPreview?.Hide();
                 return false;
             }
 
-            BeginFieldGoalAttempt(kick);
+            ShotExecutionContext context = ShotExecutionContext.FieldGoal(
+                match.CurrentPlayer,
+                shotVarianceController != null ? shotVarianceController.RunSeed : 0,
+                shotVarianceController != null ? shotVarianceController.EncounterIndex : 0,
+                match.PossessionNumber,
+                resolved.FlickSequenceNumber);
+            BeginFieldGoalAttempt(kick, context);
             return true;
         }
 
@@ -308,17 +395,37 @@ namespace PaperFootball.Tabletop.Match
                 return;
             }
 
-            ResolvedFlickParameters resolved = ResolveFlickParameters(command, "normal_flick");
+            FootballShotType shotType = ResolveNormalShotType(command);
+            ResolvedFlickParameters resolved = ResolveFlickParameters(command.WithShotType(shotType), StableIdentifierForShot(shotType), shotType);
+            activeShotContext = ShotExecutionContext.Normal(
+                shotType,
+                match.CurrentPlayer,
+                shotVarianceController != null ? shotVarianceController.RunSeed : 0,
+                shotVarianceController != null ? shotVarianceController.EncounterIndex : 0,
+                match.PossessionNumber,
+                resolved.FlickSequenceNumber);
+
             fieldGoalController?.EndAttempt();
+            fieldGoalController?.SetNonScoringShotContext(activeShotContext);
             fellResolved = false;
             restDetector?.ResetDetector();
-            footballPhysics?.Flick(resolved.ToFlickCommand());
+            if (shotType == FootballShotType.AirFlickShot)
+            {
+                LaunchAirFlick(resolved, activeShotContext);
+            }
+            else
+            {
+                airFlickLanding?.ResetState();
+                footballPhysics?.Flick(resolved.ToFlickCommand().WithShotType(FootballShotType.FlatTableShot));
+            }
+
             aimIndicator?.Hide();
+            trajectoryPreview?.Hide();
             uncertaintyPreview?.HideFlickPreview();
             Render();
         }
 
-        private void BeginFieldGoalAttempt(FieldGoalKickResult kick)
+        private void BeginFieldGoalAttempt(FieldGoalKickResult kick, ShotExecutionContext context)
         {
             if (!match.TryBeginFieldGoalAttempt())
             {
@@ -327,7 +434,9 @@ namespace PaperFootball.Tabletop.Match
                 return;
             }
 
-            fieldGoalController?.BeginAttempt(match.CurrentPlayer);
+            activeShotContext = context;
+            airFlickLanding?.ResetState();
+            fieldGoalController?.BeginAttempt(match.CurrentPlayer, context);
             fellResolved = false;
             fieldGoalAttemptTimer = 0f;
             restDetector?.ResetDetector();
@@ -346,6 +455,13 @@ namespace PaperFootball.Tabletop.Match
 
             if (match.Phase == MatchPhase.FootballMoving)
             {
+                if (activeShotContext.ShotType == FootballShotType.AirFlickShot &&
+                    airFlickLanding != null &&
+                    airFlickLanding.CurrentState == AirFlickState.Airborne)
+                {
+                    return;
+                }
+
                 ResolveStoppedFootball(false);
             }
             else if (match.Phase == MatchPhase.FieldGoalAttempt)
@@ -381,6 +497,11 @@ namespace PaperFootball.Tabletop.Match
             match.TryBeginResolving();
             match.ApplyResolution(resolution);
             MarkLatestOverhangProcessed();
+            if (activeShotContext.ShotType == FootballShotType.AirFlickShot)
+            {
+                airFlickLanding?.MarkResolved();
+            }
+
             FlickResolved?.Invoke(resolution);
 
             if (resolution == FlickResolutionType.FellFromTable || resolution == FlickResolutionType.Touchdown)
@@ -395,6 +516,9 @@ namespace PaperFootball.Tabletop.Match
                 }
             }
 
+            activeShotContext = ShotExecutionContext.None;
+            shotSelection?.ResetNormalShotType();
+            selectedNormalShotType = FootballShotType.FlatTableShot;
             Render();
         }
 
@@ -419,6 +543,8 @@ namespace PaperFootball.Tabletop.Match
             match.ApplyFieldGoalResult(successful);
             FieldGoalResolved?.Invoke(successful);
             fieldGoalAttemptTimer = 0f;
+            activeShotContext = ShotExecutionContext.None;
+            airFlickLanding?.ResetState();
             ResetBallToCurrentPlayerStart();
             Render();
         }
@@ -435,6 +561,8 @@ namespace PaperFootball.Tabletop.Match
             }
 
             match?.ResetCurrentBall();
+            activeShotContext = ShotExecutionContext.None;
+            airFlickLanding?.ResetState();
             Render();
         }
 
@@ -443,6 +571,10 @@ namespace PaperFootball.Tabletop.Match
             match?.ResetMatch();
             trajectoryPreview?.Hide();
             uncertaintyPreview?.Hide();
+            activeShotContext = ShotExecutionContext.None;
+            airFlickLanding?.ResetState();
+            selectedNormalShotType = FootballShotType.FlatTableShot;
+            shotSelection?.ResetNormalShotType();
             ResetBallToCurrentPlayerStart();
             Render();
         }
@@ -467,6 +599,7 @@ namespace PaperFootball.Tabletop.Match
             footballPhysics.PlaceAt(position, rotation);
             flickInteraction?.ClearSelection();
             restDetector?.ResetDetector();
+            airFlickLanding?.ResetState();
             fellResolved = false;
         }
 
@@ -486,11 +619,13 @@ namespace PaperFootball.Tabletop.Match
             flickInteraction?.ClearSelection();
             restDetector?.ResetDetector();
             fieldGoalController?.EndAttempt();
+            airFlickLanding?.ResetState();
             fellResolved = false;
         }
 
         private void Render()
         {
+            SetInputShotTypeForCurrentPhase();
             if (flickInteraction != null && match != null)
             {
                 flickInteraction.ApplyMatchState(match);
@@ -503,6 +638,7 @@ namespace PaperFootball.Tabletop.Match
                                             match.Phase == MatchPhase.FieldGoalSetup);
             }
 
+            shotSelection?.ApplyMatchState(match, inputSuppressed, flickInteraction != null ? flickInteraction.State : FlickInteractionState.Disabled);
             hud?.Render(match);
             MatchStateRendered?.Invoke(match);
         }
@@ -520,13 +656,43 @@ namespace PaperFootball.Tabletop.Match
                 return true;
             }
 
-            return match.Phase == MatchPhase.FieldGoalSetup && TryLaunchFieldGoalKick(command);
+            return match.Phase == MatchPhase.FieldGoalSetup && TryLaunchFieldGoalKick(command.WithShotType(FootballShotType.FieldGoalKick));
         }
 
         public void SetInputSuppressed(bool suppressed)
         {
+            if (inputSuppressed == suppressed)
+            {
+                return;
+            }
+
             inputSuppressed = suppressed;
             Render();
+        }
+
+        public void SetAirFlickModifierScales(
+            float forwardImpulseMultiplier,
+            float upwardImpulseMultiplier,
+            float launchAngleAdd,
+            float forceVarianceMultiplier,
+            float directionVarianceMultiplier,
+            float contactVarianceMultiplier,
+            float landingVarianceMultiplier,
+            float bounceMultiplier,
+            float landingYawMultiplier,
+            float previewAccuracyBonus)
+        {
+            airFlickForwardImpulseMultiplier = Mathf.Max(0.05f, forwardImpulseMultiplier);
+            airFlickUpwardImpulseMultiplier = Mathf.Max(0.05f, upwardImpulseMultiplier);
+            airFlickLaunchAngleAdd = launchAngleAdd;
+            airFlickForceVarianceMultiplier = Mathf.Max(0f, forceVarianceMultiplier);
+            airFlickDirectionVarianceMultiplier = Mathf.Max(0f, directionVarianceMultiplier);
+            airFlickContactVarianceMultiplier = Mathf.Max(0f, contactVarianceMultiplier);
+            airFlickLandingVarianceMultiplier = Mathf.Max(0f, landingVarianceMultiplier);
+            airFlickBounceMultiplier = Mathf.Max(0f, bounceMultiplier);
+            airFlickLandingYawMultiplier = Mathf.Max(0f, landingYawMultiplier);
+            airFlickPreviewAccuracyBonus = previewAccuracyBonus;
+            RebuildRuntimeAirFlickSettings();
         }
 
         public void ApplyRuntimeRules(PaperFootballRuleSet newRules)
@@ -550,6 +716,10 @@ namespace PaperFootball.Tabletop.Match
             match?.ResetMatch();
             trajectoryPreview?.Hide();
             uncertaintyPreview?.Hide();
+            activeShotContext = ShotExecutionContext.None;
+            airFlickLanding?.ResetState();
+            selectedNormalShotType = FootballShotType.FlatTableShot;
+            shotSelection?.ResetNormalShotType();
             ResetBallToCurrentPlayerStart();
             Render();
         }
@@ -565,7 +735,81 @@ namespace PaperFootball.Tabletop.Match
             Render();
         }
 
-        private ResolvedFlickParameters ResolveFlickParameters(FlickCommand command, string stableIdentifier)
+        private void LaunchAirFlick(ResolvedFlickParameters resolved, ShotExecutionContext context)
+        {
+            int landingSeed = StableSeedUtility.DeriveSeed(
+                context.RunSeed,
+                RunRandomStream.ShotVariance,
+                context.EncounterIndex,
+                context.Player,
+                context.PossessionNumber,
+                context.ShotSequenceNumber,
+                "air_flick_landing");
+
+            AirFlickShotResult result = AirFlickShotCalculator.Calculate(
+                resolved.ToFlickCommand().WithShotType(FootballShotType.AirFlickShot),
+                rules,
+                runtimeAirFlickSettings,
+                footballCollider,
+                new DeterministicRunRandom(landingSeed),
+                context);
+
+            if (!result.IsValid)
+            {
+                airFlickLanding?.ResetState();
+                footballPhysics?.Flick(resolved.ToFlickCommand().WithShotType(FootballShotType.FlatTableShot));
+                return;
+            }
+
+            airFlickLanding?.BeginTracking(result);
+            footballPhysics?.AirFlick(result);
+        }
+
+        private void OnNormalShotTypeChanged(FootballShotType shotType)
+        {
+            selectedNormalShotType = shotType == FootballShotType.AirFlickShot
+                ? FootballShotType.AirFlickShot
+                : FootballShotType.FlatTableShot;
+            SetInputShotTypeForCurrentPhase();
+        }
+
+        private void SetInputShotTypeForCurrentPhase()
+        {
+            FootballShotType shotType = GetInputShotTypeForCurrentPhase();
+            inputReader?.SetShotType(shotType);
+            flickInteraction?.SetShotType(shotType);
+        }
+
+        private FootballShotType GetInputShotTypeForCurrentPhase()
+        {
+            if (match != null && (match.Phase == MatchPhase.FieldGoalSetup || match.Phase == MatchPhase.FieldGoalAttempt))
+            {
+                return FootballShotType.FieldGoalKick;
+            }
+
+            if (match != null && (match.Phase == MatchPhase.FootballMoving || match.Phase == MatchPhase.ResolvingFlick))
+            {
+                return activeShotContext.ShotType;
+            }
+
+            return selectedNormalShotType == FootballShotType.AirFlickShot
+                ? FootballShotType.AirFlickShot
+                : FootballShotType.FlatTableShot;
+        }
+
+        private FootballShotType ResolveNormalShotType(FlickCommand command)
+        {
+            if (command.ShotType == FootballShotType.AirFlickShot)
+            {
+                return FootballShotType.AirFlickShot;
+            }
+
+            return selectedNormalShotType == FootballShotType.AirFlickShot
+                ? FootballShotType.AirFlickShot
+                : FootballShotType.FlatTableShot;
+        }
+
+        private ResolvedFlickParameters ResolveFlickParameters(FlickCommand command, string stableIdentifier, FootballShotType shotType)
         {
             if (shotVarianceController == null || match == null)
             {
@@ -577,12 +821,74 @@ namespace PaperFootball.Tabletop.Match
                 rules,
                 match.CurrentPlayer,
                 match.PossessionNumber,
-                stableIdentifier);
+                stableIdentifier,
+                GetVarianceTuning(shotType));
         }
 
         private ShotVarianceTuning GetVarianceTuning()
         {
-            return shotVarianceController != null ? shotVarianceController.CurrentTuning : ShotVarianceTuning.Disabled;
+            return GetVarianceTuning(FootballShotType.FlatTableShot);
+        }
+
+        private ShotVarianceTuning GetVarianceTuning(FootballShotType shotType)
+        {
+            ShotVarianceTuning tuning = shotVarianceController != null ? shotVarianceController.CurrentTuning : ShotVarianceTuning.Disabled;
+            if (shotType != FootballShotType.AirFlickShot || runtimeAirFlickSettings == null)
+            {
+                return tuning;
+            }
+
+            return tuning.Scaled(
+                runtimeAirFlickSettings.ForceVarianceMultiplier * airFlickForceVarianceMultiplier,
+                runtimeAirFlickSettings.DirectionVarianceMultiplier * airFlickDirectionVarianceMultiplier,
+                runtimeAirFlickSettings.ContactVarianceMultiplier * airFlickContactVarianceMultiplier,
+                airFlickPreviewAccuracyBonus);
+        }
+
+        private void EnsureRuntimeReferences()
+        {
+            if (airFlickLanding == null && footballPhysics != null)
+            {
+                airFlickLanding = footballPhysics.GetComponent<AirFlickLandingController>();
+                if (airFlickLanding == null)
+                {
+                    airFlickLanding = footballPhysics.gameObject.AddComponent<AirFlickLandingController>();
+                }
+            }
+
+            if (shotSelection == null)
+            {
+                shotSelection = FindFirstObjectByType<ShotSelectionController>();
+            }
+
+            if (shotSelection == null && hud != null)
+            {
+                shotSelection = ShotSelectionController.CreateRuntimeHud(hud.transform);
+            }
+
+            if (shotSelection != null)
+            {
+                shotSelection.NormalShotTypeChanged -= OnNormalShotTypeChanged;
+                shotSelection.NormalShotTypeChanged += OnNormalShotTypeChanged;
+            }
+        }
+
+        private void RebuildRuntimeAirFlickSettings()
+        {
+            AirFlickShotSettings source = airFlickSettings != null ? airFlickSettings : AirFlickShotSettings.CreateRuntimeDefault();
+            runtimeAirFlickSettings = source.WithRuntimeMultipliers(
+                airFlickForwardImpulseMultiplier,
+                airFlickUpwardImpulseMultiplier,
+                airFlickLaunchAngleAdd,
+                airFlickLandingVarianceMultiplier,
+                airFlickBounceMultiplier,
+                airFlickLandingYawMultiplier,
+                airFlickPreviewAccuracyBonus);
+        }
+
+        private static string StableIdentifierForShot(FootballShotType shotType)
+        {
+            return shotType == FootballShotType.AirFlickShot ? "air_flick" : "flat_table_shot";
         }
 
         private void PublishOverhangSnapshot(OverhangDebugSnapshot snapshot)

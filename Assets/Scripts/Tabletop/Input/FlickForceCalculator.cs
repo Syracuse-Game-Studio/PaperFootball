@@ -1,13 +1,19 @@
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.Input
 {
     public static class FlickForceCalculator
     {
-        public static FlickCommand Calculate(Vector3 dragStartWorld, Vector3 currentWorld, float dragDuration, PaperFootballRuleSet rules)
+        public static FlickCommand Calculate(
+            Vector3 dragStartWorld,
+            Vector3 currentWorld,
+            float dragDuration,
+            PaperFootballRuleSet rules,
+            FootballShotType shotType = FootballShotType.FlatTableShot)
         {
-            return Calculate(dragStartWorld, currentWorld, dragDuration, rules, dragStartWorld);
+            return Calculate(dragStartWorld, currentWorld, dragDuration, rules, dragStartWorld, shotType);
         }
 
         public static FlickCommand Calculate(
@@ -15,7 +21,8 @@ namespace PaperFootball.Tabletop.Input
             Vector3 currentWorld,
             float dragDuration,
             PaperFootballRuleSet rules,
-            Vector3 contactPointWorld)
+            Vector3 contactPointWorld,
+            FootballShotType shotType = FootballShotType.FlatTableShot)
         {
             PaperFootballRuleSet runtimeRules = rules ?? new PaperFootballRuleSet();
             runtimeRules.Sanitize();
@@ -26,7 +33,7 @@ namespace PaperFootball.Tabletop.Input
 
             if (unclampedDistance < runtimeRules.minimumDragDistance)
             {
-                return FlickCommand.Invalid(dragStartWorld, currentWorld, dragDuration, contactPointWorld);
+                return FlickCommand.Invalid(dragStartWorld, currentWorld, dragDuration, contactPointWorld, shotType);
             }
 
             float dragDistance = Mathf.Min(unclampedDistance, runtimeRules.maximumDragDistance);
@@ -45,7 +52,8 @@ namespace PaperFootball.Tabletop.Input
                 dragDistance,
                 Mathf.Max(0f, dragDuration),
                 strength01,
-                contactPointWorld);
+                contactPointWorld,
+                shotType);
         }
     }
 }

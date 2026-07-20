@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b46a78302b8e7e0469cce10a4f49865b, type: 3}
+  m_Script: {fileID: 11500000, guid: 7643da80df914f629966158864a99630, type: 3}
   m_Name: DefaultShotVarianceSettings
   m_EditorClassIdentifier: 
   varianceEnabled: 1

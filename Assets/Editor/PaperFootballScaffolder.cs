@@ -14,6 +14,7 @@ using PaperFootball.Tabletop.Roguelike.Presentation;
 using PaperFootball.Tabletop.Roguelike.Run;
 using PaperFootball.Tabletop.Roguelike.Variance;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -32,6 +33,7 @@ namespace PaperFootball.Editor
         private const string ConfigPath = "Assets/Materials/PaperFootballPrototype/DefaultPaperFootballConfig.asset";
         private const string RoguelikeFolder = "Assets/Materials/PaperFootballPrototype/Roguelike";
         private const string ShotVariancePath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultShotVarianceSettings.asset";
+        private const string AirFlickSettingsPath = "Assets/Materials/PaperFootballPrototype/AirFlickShotSettings.asset";
         private const string UpgradeCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultUpgradeCatalog.asset";
         private const string OpponentCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultOpponentCatalog.asset";
         private const string SurfaceCatalogPath = "Assets/Materials/PaperFootballPrototype/Roguelike/DefaultTableSurfaceCatalog.asset";
@@ -54,6 +56,7 @@ namespace PaperFootball.Editor
 
             PaperFootballConfig config = GetOrCreateConfig();
             ShotVarianceSettings shotVarianceSettings = GetOrCreateShotVarianceSettings();
+            AirFlickShotSettings airFlickShotSettings = GetOrCreateAirFlickShotSettings();
             UpgradeCatalog upgradeCatalog = GetOrCreateUpgradeCatalog();
             OpponentCatalog opponentCatalog = GetOrCreateOpponentCatalog();
             TableSurfaceCatalog surfaceCatalog = GetOrCreateSurfaceCatalog();
@@ -130,6 +133,8 @@ namespace PaperFootball.Editor
             footballBody.maxAngularVelocity = config.Rules.maximumFootballAngularVelocity;
             footballBody.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             FootballPhysicsController physicsController = EnsureComponent<FootballPhysicsController>(football);
+            AirFlickLandingController airFlickLandingController = EnsureComponent<AirFlickLandingController>(football);
+            airFlickLandingController.Configure(physicsController, tableCollider, airFlickShotSettings);
             FootballRestDetector restDetector = EnsureComponent<FootballRestDetector>(football);
             restDetector.Configure(config.Rules);
             GameObject footballFoldLine = ConfigureFootballSpinReferencePart(
@@ -191,6 +196,7 @@ namespace PaperFootball.Editor
             trajectoryPreview.Configure(footballBody, config.Rules);
 
             GameHudController hud = ConfigureHud(root.transform);
+            ShotSelectionController shotSelection = ConfigureShotSelection(hud.transform);
             OverhangDebugOverlay overhangDebugOverlay = ConfigureOverhangDebugOverlay(hud.transform);
             FootballSpinDebugOverlay spinDebugOverlay = ConfigureSpinDebugOverlay(hud.transform, physicsController);
             ContactPointIndicator contactIndicator = ConfigureContactPointIndicator(root.transform, hud.transform, contactMarkerMaterial, indicatorMaterial);
@@ -257,11 +263,14 @@ namespace PaperFootball.Editor
                 playerTwoStart.transform,
                 flickInteraction,
                 shotVarianceController,
-                uncertaintyPreview);
+                uncertaintyPreview,
+                shotSelection,
+                airFlickLandingController,
+                airFlickShotSettings);
 
             GameObject opponentObject = GetOrCreateChild("OpponentTurnController", root.transform);
             OpponentTurnController opponentTurnController = EnsureComponent<OpponentTurnController>(opponentObject);
-            opponentTurnController.Configure(matchController, physicsController, footballCollider, contactIndicator, indicator);
+            opponentTurnController.Configure(matchController, physicsController, footballCollider, contactIndicator, indicator, obstacleLayoutController);
             opponentTurnController.SetAiEnabled(false);
 
             RunProgressionUiController runUi = ConfigureRunUi(root.transform);
@@ -298,6 +307,7 @@ namespace PaperFootball.Editor
             MarkDirty(
                 config,
                 shotVarianceSettings,
+                airFlickShotSettings,
                 upgradeCatalog,
                 opponentCatalog,
                 surfaceCatalog,
@@ -318,6 +328,7 @@ namespace PaperFootball.Editor
                 trajectoryObject,
                 shotVarianceObject,
                 uncertaintyPreview.gameObject,
+                shotSelection.gameObject,
                 obstacleRoot,
                 temporaryRoot,
                 precisionTargetZone.gameObject,
@@ -384,6 +395,14 @@ namespace PaperFootball.Editor
         {
             ShotVarianceSettings settings = GetOrCreateScriptableObject<ShotVarianceSettings>(ShotVariancePath);
             settings.Configure(true, 0.03f, 1.5f, 0.0075f, false, "Stable");
+            EditorUtility.SetDirty(settings);
+            return settings;
+        }
+
+        private static AirFlickShotSettings GetOrCreateAirFlickShotSettings()
+        {
+            AirFlickShotSettings settings = GetOrCreateScriptableObject<AirFlickShotSettings>(AirFlickSettingsPath);
+            settings.Sanitize();
             EditorUtility.SetDirty(settings);
             return settings;
         }
@@ -853,6 +872,39 @@ namespace PaperFootball.Editor
             return hud;
         }
 
+        private static ShotSelectionController ConfigureShotSelection(Transform hudParent)
+        {
+            GameObject selectionObject = GetOrCreateUiChild("ShotSelectionController", hudParent);
+            RectTransform selectionRect = EnsureComponent<RectTransform>(selectionObject);
+            selectionRect.anchorMin = new Vector2(0f, 1f);
+            selectionRect.anchorMax = new Vector2(0f, 1f);
+            selectionRect.pivot = new Vector2(0f, 1f);
+            selectionRect.anchoredPosition = new Vector2(410f, -24f);
+            selectionRect.sizeDelta = new Vector2(560f, 210f);
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Text label = ConfigureText("SelectedShotLabel", selectionObject.transform, new Vector2(0f, 0f), font, 24, TextAnchor.UpperLeft);
+            label.rectTransform.anchorMin = new Vector2(0f, 1f);
+            label.rectTransform.anchorMax = new Vector2(0f, 1f);
+            label.rectTransform.pivot = new Vector2(0f, 1f);
+            label.rectTransform.sizeDelta = new Vector2(320f, 34f);
+
+            Text description = ConfigureText("ShotDescription", selectionObject.transform, new Vector2(0f, -36f), font, 17, TextAnchor.UpperLeft);
+            description.rectTransform.anchorMin = new Vector2(0f, 1f);
+            description.rectTransform.anchorMax = new Vector2(0f, 1f);
+            description.rectTransform.pivot = new Vector2(0f, 1f);
+            description.rectTransform.sizeDelta = new Vector2(520f, 84f);
+            description.horizontalOverflow = HorizontalWrapMode.Wrap;
+            description.verticalOverflow = VerticalWrapMode.Truncate;
+
+            Button flat = ConfigureCompactButton("FlatShotButton", selectionObject.transform, new Vector2(0f, -142f), "1 Flat", font, new Color(0.08f, 0.44f, 0.58f));
+            Button air = ConfigureCompactButton("AirFlickShotButton", selectionObject.transform, new Vector2(180f, -142f), "2 Flick", font, new Color(0.56f, 0.36f, 0.08f));
+
+            ShotSelectionController selector = EnsureComponent<ShotSelectionController>(selectionObject);
+            selector.Configure(flat, air, label, description);
+            return selector;
+        }
+
         private static OverhangDebugOverlay ConfigureOverhangDebugOverlay(Transform parent)
         {
             GameObject overlayObject = GetOrCreateUiChild("OverhangDebugOverlay", parent);
@@ -1277,6 +1329,30 @@ namespace PaperFootball.Editor
             Button button = EnsureComponent<Button>(buttonObject);
 
             Text text = ConfigureText($"{name}Text", buttonObject.transform, Vector2.zero, font, 28, TextAnchor.MiddleCenter);
+            text.text = label;
+            text.rectTransform.anchorMin = Vector2.zero;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            text.rectTransform.anchoredPosition = Vector2.zero;
+            text.rectTransform.sizeDelta = Vector2.zero;
+            return button;
+        }
+
+        private static Button ConfigureCompactButton(string name, Transform parent, Vector2 anchoredPosition, string label, Font font, Color color)
+        {
+            GameObject buttonObject = GetOrCreateUiChild(name, parent);
+            RectTransform rect = EnsureComponent<RectTransform>(buttonObject);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(160f, 48f);
+
+            Image image = EnsureComponent<Image>(buttonObject);
+            image.color = color;
+            Button button = EnsureComponent<Button>(buttonObject);
+
+            Text text = ConfigureText($"{name}Text", buttonObject.transform, Vector2.zero, font, 20, TextAnchor.MiddleCenter);
             text.text = label;
             text.rectTransform.anchorMin = Vector2.zero;
             text.rectTransform.anchorMax = Vector2.one;

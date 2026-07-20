@@ -6,6 +6,7 @@ using PaperFootball.Tabletop.Match;
 using PaperFootball.Tabletop.Physics;
 using PaperFootball.Tabletop.Presentation;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -54,6 +55,54 @@ namespace PaperFootball.Tabletop.PlayModeTests
 
             fieldGoalController.BeginAttempt(PaperFootballPlayer.PlayerOne);
             fieldGoalController.ReportGoalMouthEntered(PaperFootballPlayer.PlayerOne, physics.GetComponent<Collider>());
+            fieldGoalController.ReportGoalMouthEntered(PaperFootballPlayer.PlayerOne, physics.GetComponent<Collider>());
+
+            Assert.That(scoreEvents, Is.EqualTo(1));
+            Assert.IsTrue(fieldGoalController.ScoredThisAttempt);
+        }
+
+        [UnityTest]
+        public IEnumerator NormalShotTypesCannotScoreFieldGoals()
+        {
+            yield return LoadPrototypeScene();
+            FieldGoalController fieldGoalController = Object.FindFirstObjectByType<FieldGoalController>();
+            FootballPhysicsController physics = Object.FindFirstObjectByType<FootballPhysicsController>();
+            int scoreEvents = 0;
+            fieldGoalController.FieldGoalScored += () => scoreEvents++;
+
+            fieldGoalController.SetNonScoringShotContext(ShotExecutionContext.Normal(
+                FootballShotType.AirFlickShot,
+                PaperFootballPlayer.PlayerOne,
+                10,
+                0,
+                1,
+                1));
+            fieldGoalController.ReportGoalMouthEntered(PaperFootballPlayer.PlayerOne, physics.GetComponent<Collider>());
+            fieldGoalController.SetNonScoringShotContext(ShotExecutionContext.Normal(
+                FootballShotType.FlatTableShot,
+                PaperFootballPlayer.PlayerOne,
+                10,
+                0,
+                1,
+                2));
+            fieldGoalController.ReportGoalMouthEntered(PaperFootballPlayer.PlayerOne, physics.GetComponent<Collider>());
+
+            Assert.That(scoreEvents, Is.EqualTo(0));
+            Assert.IsFalse(fieldGoalController.ScoredThisAttempt);
+        }
+
+        [UnityTest]
+        public IEnumerator LegitimateFieldGoalKickStillScores()
+        {
+            yield return LoadPrototypeScene();
+            FieldGoalController fieldGoalController = Object.FindFirstObjectByType<FieldGoalController>();
+            FootballPhysicsController physics = Object.FindFirstObjectByType<FootballPhysicsController>();
+            int scoreEvents = 0;
+            fieldGoalController.FieldGoalScored += () => scoreEvents++;
+
+            fieldGoalController.BeginAttempt(
+                PaperFootballPlayer.PlayerOne,
+                ShotExecutionContext.FieldGoal(PaperFootballPlayer.PlayerOne, 10, 0, 1, 3));
             fieldGoalController.ReportGoalMouthEntered(PaperFootballPlayer.PlayerOne, physics.GetComponent<Collider>());
 
             Assert.That(scoreEvents, Is.EqualTo(1));

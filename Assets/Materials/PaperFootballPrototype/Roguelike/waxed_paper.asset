@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: c43569fac0714ddc8a96c59088c5fbd7, type: 3}
   m_Name: waxed_paper
   m_EditorClassIdentifier: PaperFootball.Tabletop:PaperFootball.Tabletop.Roguelike.Modifiers:FootballUpgradeDefinition
   stableId: waxed_paper

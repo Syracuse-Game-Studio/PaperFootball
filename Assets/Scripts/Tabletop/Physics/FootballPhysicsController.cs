@@ -1,6 +1,7 @@
 using PaperFootball.Tabletop.Input;
 using PaperFootball.Tabletop.FieldGoals;
 using PaperFootball.Tabletop.Rules;
+using PaperFootball.Tabletop.Shots;
 using UnityEngine;
 
 namespace PaperFootball.Tabletop.Physics
@@ -18,6 +19,8 @@ namespace PaperFootball.Tabletop.Physics
         private Collider footballCollider;
         private PendingImpulse pendingImpulse;
         private bool hasPendingImpulse;
+        private Vector3 pendingTorqueImpulse;
+        private bool hasPendingTorqueImpulse;
         private float debugLineExpiresAt;
         private bool isTrackingFlick;
         private Vector3 trackedLastPosition;
@@ -39,6 +42,7 @@ namespace PaperFootball.Tabletop.Physics
         public float LastFlickTotalYawDegrees { get; private set; }
         public float LastFlickPeakYawVelocity { get; private set; }
         public float LastFlickTravelDistance { get; private set; }
+        public FootballShotType LastShotType { get; private set; } = FootballShotType.FlatTableShot;
         public float AngularDamping => body != null ? body.angularDamping : angularDamping;
         public float ContactYawTorqueMultiplier => contactYawTorqueMultiplier;
 
@@ -77,7 +81,17 @@ namespace PaperFootball.Tabletop.Physics
                 impulse += Vector3.up * upwardImpulse;
             }
 
-            QueueImpulse(impulse, command.HasContactPoint, command.ContactPointWorld);
+            QueueImpulse(impulse, command.HasContactPoint, command.ContactPointWorld, true, command.ShotType);
+        }
+
+        public void AirFlick(AirFlickShotResult result)
+        {
+            if (body == null || !result.IsValid)
+            {
+                return;
+            }
+
+            QueueImpulse(result.TotalImpulse, result.HasContactPoint, result.ContactPointWorld, true, FootballShotType.AirFlickShot);
         }
 
         public void KickFieldGoal(FieldGoalKickResult result)
@@ -87,7 +101,7 @@ namespace PaperFootball.Tabletop.Physics
                 return;
             }
 
-            QueueImpulse(result.TotalImpulse, result.HasContactPoint, result.ContactPointWorld);
+            QueueImpulse(result.TotalImpulse, result.HasContactPoint, result.ContactPointWorld, true, FootballShotType.FieldGoalKick);
         }
 
         public void ApplyExternalImpulse(Vector3 impulse)
@@ -97,7 +111,7 @@ namespace PaperFootball.Tabletop.Physics
                 return;
             }
 
-            QueueImpulse(impulse, false, body.worldCenterOfMass, false);
+            QueueImpulse(impulse, false, body.worldCenterOfMass, false, LastShotType);
         }
 
         public void ApplyExternalImpulseAtPoint(Vector3 impulse, Vector3 worldPoint)
@@ -107,7 +121,19 @@ namespace PaperFootball.Tabletop.Physics
                 return;
             }
 
-            QueueImpulse(impulse, true, worldPoint, false);
+            QueueImpulse(impulse, true, worldPoint, false, LastShotType);
+        }
+
+        public void ApplyExternalTorqueImpulse(Vector3 torqueImpulse)
+        {
+            if (body == null || torqueImpulse.sqrMagnitude <= 0.000001f)
+            {
+                return;
+            }
+
+            pendingTorqueImpulse += torqueImpulse;
+            hasPendingTorqueImpulse = true;
+            body.WakeUp();
         }
 
         public void SetCenterOfMassOffset(Vector3 localOffset)
@@ -128,11 +154,14 @@ namespace PaperFootball.Tabletop.Physics
             }
 
             hasPendingImpulse = false;
+            hasPendingTorqueImpulse = false;
+            pendingTorqueImpulse = Vector3.zero;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.Sleep();
             ClearLastImpulseDebug();
             StopTrackingFlick();
+            LastShotType = FootballShotType.FlatTableShot;
         }
 
         public void PlaceAt(Vector3 position, Quaternion rotation)
@@ -150,12 +179,15 @@ namespace PaperFootball.Tabletop.Physics
             body.position = position;
             body.rotation = rotation;
             hasPendingImpulse = false;
+            hasPendingTorqueImpulse = false;
+            pendingTorqueImpulse = Vector3.zero;
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;
             body.Sleep();
             transform.SetPositionAndRotation(position, rotation);
             ClearLastImpulseDebug();
             StopTrackingFlick();
+            LastShotType = FootballShotType.FlatTableShot;
         }
 
         private void Awake()
@@ -167,16 +199,27 @@ namespace PaperFootball.Tabletop.Physics
 
         private void FixedUpdate()
         {
-            if (!hasPendingImpulse || body == null)
+            if (body == null)
             {
-                UpdateFlickTracking();
-                DrawLastImpulseDebugLine();
                 return;
             }
 
-            PendingImpulse impulse = pendingImpulse;
-            hasPendingImpulse = false;
-            ApplyImpulse(impulse);
+            if (hasPendingImpulse)
+            {
+                PendingImpulse impulse = pendingImpulse;
+                hasPendingImpulse = false;
+                ApplyImpulse(impulse);
+            }
+
+            if (hasPendingTorqueImpulse)
+            {
+                Vector3 torque = pendingTorqueImpulse;
+                pendingTorqueImpulse = Vector3.zero;
+                hasPendingTorqueImpulse = false;
+                body.WakeUp();
+                body.AddTorque(torque, ForceMode.Impulse);
+            }
+
             UpdateFlickTracking();
             DrawLastImpulseDebugLine();
         }
@@ -195,9 +238,14 @@ namespace PaperFootball.Tabletop.Physics
                 : RigidbodyConstraints.None;
         }
 
-        private void QueueImpulse(Vector3 impulse, bool applyAtContactPoint, Vector3 contactPointWorld, bool trackAsFlick = true)
+        private void QueueImpulse(
+            Vector3 impulse,
+            bool applyAtContactPoint,
+            Vector3 contactPointWorld,
+            bool trackAsFlick = true,
+            FootballShotType shotType = FootballShotType.FlatTableShot)
         {
-            pendingImpulse = new PendingImpulse(impulse, applyAtContactPoint, contactPointWorld, trackAsFlick);
+            pendingImpulse = new PendingImpulse(impulse, applyAtContactPoint, contactPointWorld, trackAsFlick, shotType);
             hasPendingImpulse = true;
             body.WakeUp();
         }
@@ -210,6 +258,7 @@ namespace PaperFootball.Tabletop.Physics
                 BeginTrackingFlick();
             }
 
+            LastShotType = impulse.ShotType;
             if (!impulse.ApplyAtContactPoint)
             {
                 body.AddForce(impulse.Force, ForceMode.Impulse);
@@ -341,18 +390,25 @@ namespace PaperFootball.Tabletop.Physics
 
         private readonly struct PendingImpulse
         {
-            public PendingImpulse(Vector3 force, bool applyAtContactPoint, Vector3 contactPointWorld, bool trackAsFlick)
+            public PendingImpulse(
+                Vector3 force,
+                bool applyAtContactPoint,
+                Vector3 contactPointWorld,
+                bool trackAsFlick,
+                FootballShotType shotType)
             {
                 Force = force;
                 ApplyAtContactPoint = applyAtContactPoint;
                 ContactPointWorld = contactPointWorld;
                 TrackAsFlick = trackAsFlick;
+                ShotType = shotType;
             }
 
             public Vector3 Force { get; }
             public bool ApplyAtContactPoint { get; }
             public Vector3 ContactPointWorld { get; }
             public bool TrackAsFlick { get; }
+            public FootballShotType ShotType { get; }
         }
     }
 }
